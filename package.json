@@ -1,0 +1,15 @@
+{
+  "name": "bot-status-report",
+  "version": "1.0.0",
+  "description": "Bot para enviar status de projeto via WhatsApp ou HTTP",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "googleapis": "^133.0.0",
+    "node-cron": "^3.0.2"
+  }
+}
