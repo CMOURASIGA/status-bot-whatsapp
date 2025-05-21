@@ -1,0 +1,6 @@
+# Ignorar arquivos sensíveis
+.env
+credentials.json
+
+# Pastas geradas automaticamente
+node_modules
