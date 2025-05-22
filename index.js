@@ -1,6 +1,7 @@
 const express = require("express");
 const axios = require("axios");
 const cron = require("node-cron");
+require("dotenv/config");
 
 const app = express();
 app.use(express.json());
@@ -9,23 +10,36 @@ const PORT = process.env.PORT || 3000;
 
 async function buscarStatusProjeto(projetoNome) {
   try {
-    const url = `https://cnc.kanbanize.com/api/v2/cards`;
     const headers = {
       apikey: process.env.BUSINESSMAP_API_KEY,
       accept: "application/json"
     };
 
-    const response = await axios.get(url, { headers });
+    // 1. Buscar todos os boards disponíveis
+    const boardsUrl = `https://cnc.kanbanize.com/api/v2/boards`;
+    const boardsResponse = await axios.get(boardsUrl, { headers });
+    const boards = boardsResponse.data;
 
-    if (!Array.isArray(response.data.cards)) {
-      throw new Error("Formato inesperado de resposta da API");
+    if (!Array.isArray(boards)) {
+      throw new Error("Formato inesperado de resposta da API (boards)");
     }
 
-    const cards = response.data.cards || []; // acessa a lista de cards corretamente
-    const projeto = cards.find(card =>
+    let allCards = [];
+
+    // 2. Buscar todos os cards de cada board
+    for (const board of boards) {
+      const cardsUrl = `https://cnc.kanbanize.com/api/v2/boards/${board.board_id}/cards`;
+      const cardsResponse = await axios.get(cardsUrl, { headers });
+      if (Array.isArray(cardsResponse.data)) {
+        allCards = allCards.concat(cardsResponse.data);
+      }
+    }
+
+    // 3. Encontrar o projeto por ID direto ou pelo título (parcial)
+    const projeto = allCards.find(card =>
+      card.card_id.toString() === projetoNome ||
       card.title.toLowerCase().includes(projetoNome.toLowerCase())
     );
-
 
     if (!projeto) {
       return "❌ Projeto não encontrado na base de dados do Businessmap.";
