@@ -37,25 +37,25 @@ app.post("/webhook", async (req, res) => {
       const texto = message.text.body.toLowerCase();
       const numero = message.from;
 
-      // Lista de nomes conhecidos temporária
-      const projetosValidos = ["app-financeiro", "sistema-web", "gestao-tarefas"];
-      const projetoEncontrado = projetosValidos.find((p) => texto.includes(p));
-
-      if (projetoEncontrado) {
+      if (texto.includes("menu")) {
+        await enviarMensagem(
+          numero,
+          "📋 *Menu de Comandos:*\n1. status app-financeiro\n2. mensagem do dia\n3. ajuda"
+        );
+      } else if (texto.includes("mensagem")) {
+        await enviarMensagem(numero, "🌟 Acredite: todo dia é uma nova oportunidade de evoluir!");
+      } else if (texto.includes("ajuda")) {
+        await enviarMensagem(numero, "ℹ️ Digite 'menu' para ver todas as opções disponíveis.");
+      } else {
         try {
-          const status = await buscarStatusProjeto(projetoEncontrado);
+          const status = await buscarStatusProjeto(texto);
           await enviarMensagem(numero, status);
         } catch (e) {
-          await enviarMensagem(numero, `Erro ao buscar o status do projeto \"${projetoEncontrado}\".`);
+          await enviarMensagem(
+            numero,
+            "❓ Não entendi sua mensagem ou o projeto não foi encontrado. Digite *menu* para ver os comandos disponíveis."
+          );
         }
-      } else if (texto.includes("menu")) {
-        await enviarMensagem(numero, "Menu de Comandos:\n1. status app-financeiro\n2. mensagem do dia\n3. ajuda");
-      } else if (texto.includes("mensagem")) {
-        await enviarMensagem(numero, "Acredite: todo dia é uma nova oportunidade de evoluir!");
-      } else if (texto.includes("ajuda")) {
-        await enviarMensagem(numero, "Digite 'menu' para ver todas as opções disponíveis.");
-      } else {
-        await enviarMensagem(numero, "Não entendi sua mensagem. Digite *menu* para ver os comandos disponíveis.");
       }
     }
 
@@ -100,7 +100,7 @@ app.listen(PORT, () => {
 // Endpoint manual para testes rápidos via browser
 app.get("/enviar", async (req, res) => {
   const numero = req.query.numero || process.env.DESTINO_TESTE;
-  const mensagem = req.query.msg || "Bot do Project_Manager_Bot ativo!";
+  const mensagem = req.query.msg || "✅ Bot do Project_Manager_Bot ativo!";
 
   try {
     await enviarMensagem(numero, mensagem);
