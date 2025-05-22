@@ -46,19 +46,16 @@ app.post("/webhook", async (req, res) => {
           const status = await buscarStatusProjeto(projetoEncontrado);
           await enviarMensagem(numero, status);
         } catch (e) {
-          await enviarMensagem(numero, `❌ Erro ao buscar o status do projeto \"${projetoEncontrado}\".`);
+          await enviarMensagem(numero, `Erro ao buscar o status do projeto \"${projetoEncontrado}\".`);
         }
       } else if (texto.includes("menu")) {
-        await enviarMensagem(numero, "\ud83d\udccb *Menu de Comandos:*
-1. status app-financeiro
-2. mensagem do dia
-3. ajuda");
+        await enviarMensagem(numero, "Menu de Comandos:\n1. status app-financeiro\n2. mensagem do dia\n3. ajuda");
       } else if (texto.includes("mensagem")) {
-        await enviarMensagem(numero, "\ud83c\udf1f Acredite: todo dia é uma nova oportunidade de evoluir!");
+        await enviarMensagem(numero, "Acredite: todo dia é uma nova oportunidade de evoluir!");
       } else if (texto.includes("ajuda")) {
-        await enviarMensagem(numero, "\u2139\ufe0f Digite 'menu' para ver todas as opções disponíveis.");
+        await enviarMensagem(numero, "Digite 'menu' para ver todas as opções disponíveis.");
       } else {
-        await enviarMensagem(numero, "\u2753 Não entendi sua mensagem. Digite *menu* para ver os comandos disponíveis.");
+        await enviarMensagem(numero, "Não entendi sua mensagem. Digite *menu* para ver os comandos disponíveis.");
       }
     }
 
@@ -103,7 +100,7 @@ app.listen(PORT, () => {
 // Endpoint manual para testes rápidos via browser
 app.get("/enviar", async (req, res) => {
   const numero = req.query.numero || process.env.DESTINO_TESTE;
-  const mensagem = req.query.msg || "\u2705 Bot do Project_Manager_Bot ativo!";
+  const mensagem = req.query.msg || "Bot do Project_Manager_Bot ativo!";
 
   try {
     await enviarMensagem(numero, mensagem);
