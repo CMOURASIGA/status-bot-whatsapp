@@ -8,6 +8,10 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
+function removerHtmlTags(texto) {
+  return texto?.replace(/<[^>]*>?/gm, '').trim() || "(Não informado)";
+}
+
 async function buscarStatusProjeto(projetoNome) {
   try {
     const headers = {
@@ -15,39 +19,28 @@ async function buscarStatusProjeto(projetoNome) {
       accept: "application/json"
     };
 
-    let projeto = null;
+    const boardsUrl = `https://cnc.kanbanize.com/api/v2/boards`;
+    const boardsResponse = await axios.get(boardsUrl, { headers });
+    const boards = boardsResponse.data;
 
-    // Se for número, tenta buscar como card_id direto
-    if (!isNaN(projetoNome)) {
-      const urlDireta = `https://cnc.kanbanize.com/api/v2/cards/${projetoNome}`;
-      const resposta = await axios.get(urlDireta, { headers });
-      projeto = resposta.data.data; // o .data vem dentro de data
-    } else {
-      // Se não for número, buscar por título (varrendo boards)
-      const boardsUrl = `https://cnc.kanbanize.com/api/v2/boards`;
-      const boardsResponse = await axios.get(boardsUrl, { headers });
-      const boards = boardsResponse.data;
+    if (!Array.isArray(boards)) {
+      throw new Error("Formato inesperado de resposta da API (boards)");
+    }
 
-      if (!Array.isArray(boards)) {
-        throw new Error("Formato inesperado de resposta da API (boards)");
-      }
+    let allCards = [];
 
-      for (const board of boards) {
-        const cardsUrl = `https://cnc.kanbanize.com/api/v2/boards/${board.board_id}/cards`;
-        const cardsResponse = await axios.get(cardsUrl, { headers });
-        const cards = cardsResponse.data;
-
-        if (Array.isArray(cards)) {
-          const encontrado = cards.find(card =>
-            card.title.toLowerCase().includes(projetoNome.toLowerCase())
-          );
-          if (encontrado) {
-            projeto = encontrado;
-            break;
-          }
-        }
+    for (const board of boards) {
+      const cardsUrl = `https://cnc.kanbanize.com/api/v2/boards/${board.board_id}/cards`;
+      const cardsResponse = await axios.get(cardsUrl, { headers });
+      if (Array.isArray(cardsResponse.data)) {
+        allCards = allCards.concat(cardsResponse.data);
       }
     }
+
+    const projeto = allCards.find(card =>
+      card.card_id.toString() === projetoNome ||
+      card.title.toLowerCase().includes(projetoNome.toLowerCase())
+    );
 
     if (!projeto) {
       return "❌ Projeto não encontrado na base de dados do Businessmap.";
@@ -57,27 +50,25 @@ async function buscarStatusProjeto(projetoNome) {
     const subtarefasPendentes = projeto.unfinished_subtask_count || 0;
     const resumo5w2h = projeto.custom_fields?.[0]?.value || "(Resumo 5W2H não preenchido)";
 
-    const resposta = `📊 *Status do Projeto: ${projeto.title}*
+    const resposta = `📊 *Status do Projeto: ${removerHtmlTags(projeto.title)}*
 
-📌 *Objetivo:* ${projeto.description || "(Sem descrição)"}
+📌 *Objetivo:* ${removerHtmlTags(projeto.description)}
 
 📍 *Status atual:* Coluna ${projeto.column_id || "-"}
 🗓️ *Período previsto:* ${projeto.initiative_details?.planned_start_date || "-"} até ${projeto.initiative_details?.planned_end_date || "-"}
 
-📋 *Subtarefas:*
-✅ ${subtarefasConcluidas} finalizadas
-⏳ ${subtarefasPendentes} pendentes
+📋 *Subtarefas:*\n✅ ${subtarefasConcluidas} finalizadas\n⏳ ${subtarefasPendentes} pendentes
 
-🧠 *Resumo Estratégico (5W2H)*\n${resumo5w2h}`;
+🧠 *Resumo Estratégico (5W2H)*
+
+${removerHtmlTags(resumo5w2h)}`;
 
     return resposta;
   } catch (error) {
-    console.error("Erro ao buscar status do projeto:", error.response?.data || error.message);
+    console.error("Erro ao buscar status do projeto:", error);
     return "❌ Ocorreu um erro ao consultar o status do projeto.";
   }
 }
-
-
 
 async function enviarMensagem(numero, mensagem) {
   try {
