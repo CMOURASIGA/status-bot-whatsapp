@@ -17,13 +17,15 @@ async function buscarStatusProjeto(projetoNome) {
 
     const response = await axios.get(url, { headers });
 
-    if (!Array.isArray(response.data)) {
+    if (!Array.isArray(response.data.cards)) {
       throw new Error("Formato inesperado de resposta da API");
     }
 
-    const projeto = response.data.find(card =>
+    const cards = response.data.cards || []; // acessa a lista de cards corretamente
+    const projeto = cards.find(card =>
       card.title.toLowerCase().includes(projetoNome.toLowerCase())
     );
+
 
     if (!projeto) {
       return "❌ Projeto não encontrado na base de dados do Businessmap.";
