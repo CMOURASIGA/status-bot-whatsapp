@@ -48,11 +48,17 @@ app.post("/webhook", async (req, res) => {
         } catch (e) {
           await enviarMensagem(numero, `❌ Erro ao buscar o status do projeto \"${projetoEncontrado}\".`);
         }
+      } else if (texto.includes("menu")) {
+        await enviarMensagem(numero, "\ud83d\udccb *Menu de Comandos:*
+1. status app-financeiro
+2. mensagem do dia
+3. ajuda");
+      } else if (texto.includes("mensagem")) {
+        await enviarMensagem(numero, "\ud83c\udf1f Acredite: todo dia é uma nova oportunidade de evoluir!");
+      } else if (texto.includes("ajuda")) {
+        await enviarMensagem(numero, "\u2139\ufe0f Digite 'menu' para ver todas as opções disponíveis.");
       } else {
-        await enviarMensagem(
-          numero,
-          "❓ Não encontrei o nome de um projeto válido na sua mensagem. Tente algo como:\n👉 Qual o status do projeto *app-financeiro*?"
-        );
+        await enviarMensagem(numero, "\u2753 Não entendi sua mensagem. Digite *menu* para ver os comandos disponíveis.");
       }
     }
 
@@ -70,17 +76,17 @@ async function enviarMensagem(numero, mensagem) {
         messaging_product: "whatsapp",
         to: numero,
         type: "text",
-        text: { body: mensagem }
+        text: { body: mensagem },
       },
       {
         headers: {
           Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+        },
       }
     );
   } catch (error) {
-    console.error("Erro ao enviar mensagem:", error.message);
+    console.error("Erro ao enviar mensagem:", error.response?.data || error.message);
   }
 }
 
@@ -97,7 +103,7 @@ app.listen(PORT, () => {
 // Endpoint manual para testes rápidos via browser
 app.get("/enviar", async (req, res) => {
   const numero = req.query.numero || process.env.DESTINO_TESTE;
-  const mensagem = req.query.msg || "✅ Bot do Project_Manager_Bot ativo!";
+  const mensagem = req.query.msg || "\u2705 Bot do Project_Manager_Bot ativo!";
 
   try {
     await enviarMensagem(numero, mensagem);
@@ -107,4 +113,17 @@ app.get("/enviar", async (req, res) => {
   }
 });
 
+// Endpoint GET para verificação do Webhook com a Meta
+app.get("/webhook", (req, res) => {
+  const VERIFY_TOKEN = "meu_token_webhook";
+  const mode = req.query["hub.mode"];
+  const token = req.query["hub.verify_token"];
+  const challenge = req.query["hub.challenge"];
 
+  if (mode === "subscribe" && token === VERIFY_TOKEN) {
+    console.log("Webhook verificado com sucesso!");
+    res.status(200).send(challenge);
+  } else {
+    res.sendStatus(403);
+  }
+});
