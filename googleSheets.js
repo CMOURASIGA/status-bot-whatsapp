@@ -1,28 +1,30 @@
-const { google } = require("googleapis");
+const fs = require("fs");
+const path = require("path");
 require("dotenv").config();
-
-const SHEET_ID = process.env.SHEET_ID;
-const SHEET_NAME = "Projetos_Status";
+const { google } = require("googleapis");
 
 async function autorizarGoogle() {
+  const credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS);
+  //const credentials = JSON.parse(fs.readFileSync(path.resolve(process.env.GOOGLE_CREDENTIALS_PATH)));
   const auth = new google.auth.GoogleAuth({
-    credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS),
+    credentials,
     scopes: ["https://www.googleapis.com/auth/spreadsheets.readonly"],
   });
+
   return await auth.getClient();
 }
+
 
 async function buscarStatusProjeto(nomeProjeto) {
   const authClient = await autorizarGoogle();
   const sheets = google.sheets({ version: "v4", auth: authClient });
 
   const response = await sheets.spreadsheets.values.get({
-    spreadsheetId: SHEET_ID,
-    range: `${SHEET_NAME}!A2:G`,
+    spreadsheetId: process.env.SHEET_ID,
+    range: "Projetos_Status!A2:G",
   });
 
   const rows = response.data.values;
-
   if (!rows || rows.length === 0) {
     throw new Error("Planilha vazia ou não encontrada.");
   }
@@ -47,5 +49,5 @@ async function buscarStatusProjeto(nomeProjeto) {
 }
 
 module.exports = {
-  buscarStatusProjeto,
+  buscarStatusProjeto
 };
