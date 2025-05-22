@@ -32,3 +32,29 @@ cron.schedule("0 9 * * 1", () => {
 app.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
 });
+
+app.get("/enviar", async (req, res) => {
+  const numero = req.query.numero || process.env.DESTINO_TESTE;
+  const mensagem = req.query.msg || "✅ Bot do Project_Manager_Bot ativo!";
+
+  try {
+    await axios.post(
+      `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to: numero,
+        type: "text",
+        text: { body: mensagem }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+    res.send("Mensagem enviada com sucesso!");
+  } catch (error) {
+    res.send(`Erro ao enviar mensagem: ${error.message}`);
+  }
+});
