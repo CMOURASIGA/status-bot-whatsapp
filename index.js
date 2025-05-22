@@ -1,30 +1,84 @@
 const express = require("express");
-const { buscarStatusProjeto } = require("./googleSheets");
-const cron = require("node-cron");
 const axios = require("axios");
+const cron = require("node-cron");
+require("dotenv\config");
 
 const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-// Endpoint de teste manual via browser ou ferramenta externa
-app.get("/status", async (req, res) => {
-  const projeto = req.query.projeto;
-
-  if (!projeto) {
-    return res.status(400).send("Projeto não informado. Use ?projeto=nome-do-projeto");
-  }
-
+async function buscarStatusProjeto(projetoNome) {
   try {
-    const status = await buscarStatusProjeto(projeto);
-    return res.send(status);
-  } catch (error) {
-    return res.status(500).send("Erro ao buscar status do projeto: " + error.message);
-  }
-});
+    const url = `https://cnc.kanbanize.com/api/v2/cards`;
+    const headers = {
+      apikey: process.env.BUSINESSMAP_API_KEY,
+      accept: "application/json"
+    };
 
-// Webhook do WhatsApp
+    const response = await axios.get(url, { headers });
+
+    if (!Array.isArray(response.data)) {
+      throw new Error("Formato inesperado de resposta da API");
+    }
+
+    const projeto = response.data.find(card =>
+      card.title.toLowerCase().includes(projetoNome.toLowerCase())
+    );
+
+    if (!projeto) {
+      return "❌ Projeto não encontrado na base de dados do Businessmap.";
+    }
+
+    const subtarefasConcluidas = projeto.finished_subtask_count || 0;
+    const subtarefasPendentes = projeto.unfinished_subtask_count || 0;
+    const resumo5w2h = projeto.custom_fields?.[0]?.value || "(Resumo 5W2H não preenchido)";
+
+    const resposta = `📊 *Status do Projeto: ${projeto.title}*
+
+` +
+      `📌 *Objetivo:* ${projeto.description || "(Sem descrição)"}
+
+` +
+      `📍 *Status atual:* Coluna ${projeto.column_id || "-"}
+` +
+      `🗓️ *Período previsto:* ${projeto.initiative_details?.planned_start_date || "-"} até ${projeto.initiative_details?.planned_end_date || "-"}
+
+` +
+      `📋 *Subtarefas:*\n✅ ${subtarefasConcluidas} finalizadas\n⏳ ${subtarefasPendentes} pendentes
+
+` +
+      `🧠 *Resumo Estratégico (5W2H)*\n${resumo5w2h}`;
+
+    return resposta;
+  } catch (error) {
+    console.error("Erro ao buscar status do projeto:", error);
+    return "❌ Ocorreu um erro ao consultar o status do projeto.";
+  }
+}
+
+async function enviarMensagem(numero, mensagem) {
+  try {
+    await axios.post(
+      `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to: numero,
+        type: "text",
+        text: { body: mensagem }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+  } catch (error) {
+    console.error("Erro ao enviar mensagem:", error.response?.data || error.message);
+  }
+}
+
 app.post("/webhook", async (req, res) => {
   const body = req.body;
 
@@ -37,23 +91,11 @@ app.post("/webhook", async (req, res) => {
       const texto = message.text.body.trim().toLowerCase();
       const numero = message.from;
 
-      const saudacoes = ["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite", "menu"];
-
-      if (saudacoes.some(s => texto.includes(s))) {
-        await enviarMensagem(
-          numero,
-          "Olá! 👋 Me diga o nome do projeto que deseja consultar o status.\nExemplo: *app-financeiro*, *eac*, *sistema-web*..."
-        );
-      } else {
-        try {
-          const status = await buscarStatusProjeto(texto);
-          await enviarMensagem(numero, status);
-        } catch (e) {
-          await enviarMensagem(
-            numero,
-            "❌ Não encontrei esse projeto. Verifique o nome ou envie outro para consulta."
-          );
-        }
+      try {
+        const status = await buscarStatusProjeto(texto);
+        await enviarMensagem(numero, status);
+      } catch (e) {
+        await enviarMensagem(numero, "❌ Ocorreu um erro inesperado. Tente novamente mais tarde.");
       }
     }
 
@@ -63,53 +105,6 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-
-async function enviarMensagem(numero, mensagem) {
-  try {
-    await axios.post(
-      `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}/messages`,
-      {
-        messaging_product: "whatsapp",
-        to: numero,
-        type: "text",
-        text: { body: mensagem },
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
-  } catch (error) {
-    console.error("Erro ao enviar mensagem:", error.response?.data || error.message);
-  }
-}
-
-// Exemplo de CRON job para enviar relatório automático (simulação)
-cron.schedule("0 9 * * 1", () => {
-  console.log("[CRON] Segunda-feira 9h - Enviar relatórios automáticos");
-  // Aqui você pode chamar a função de envio para todos os projetos
-});
-
-app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
-});
-
-// Endpoint manual para testes rápidos via browser
-app.get("/enviar", async (req, res) => {
-  const numero = req.query.numero || process.env.DESTINO_TESTE;
-  const mensagem = req.query.msg || "✅ Bot do Project_Manager_Bot ativo!";
-
-  try {
-    await enviarMensagem(numero, mensagem);
-    res.send("Mensagem enviada com sucesso!");
-  } catch (error) {
-    res.send(`Erro ao enviar mensagem: ${error.message}`);
-  }
-});
-
-// Endpoint GET para verificação do Webhook com a Meta
 app.get("/webhook", (req, res) => {
   const VERIFY_TOKEN = "meu_token_webhook";
   const mode = req.query["hub.mode"];
@@ -122,4 +117,8 @@ app.get("/webhook", (req, res) => {
   } else {
     res.sendStatus(403);
   }
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor rodando na porta ${PORT}`);
 });
