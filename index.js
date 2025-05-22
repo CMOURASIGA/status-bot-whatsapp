@@ -8,26 +8,22 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-async function buscarStatusProjeto(projetoInput) {
+async function buscarStatusProjeto(projetoNome) {
   try {
     const headers = {
       apikey: process.env.BUSINESSMAP_API_KEY,
       accept: "application/json"
     };
 
-    const isNumero = !isNaN(projetoInput);
     let projeto = null;
 
-    if (isNumero) {
-      // Buscar direto pelo ID
-      const url = `https://cnc.kanbanize.com/api/v2/cards/${projetoInput}`;
-      const response = await axios.get(url, { headers });
-
-      if (response.data?.card_id) {
-        projeto = response.data;
-      }
+    // Se for número, tenta buscar como card_id direto
+    if (!isNaN(projetoNome)) {
+      const urlDireta = `https://cnc.kanbanize.com/api/v2/cards/${projetoNome}`;
+      const resposta = await axios.get(urlDireta, { headers });
+      projeto = resposta.data.data; // o .data vem dentro de data
     } else {
-      // Buscar por título, listando todos os cards de todos os boards
+      // Se não for número, buscar por título (varrendo boards)
       const boardsUrl = `https://cnc.kanbanize.com/api/v2/boards`;
       const boardsResponse = await axios.get(boardsUrl, { headers });
       const boards = boardsResponse.data;
@@ -36,19 +32,21 @@ async function buscarStatusProjeto(projetoInput) {
         throw new Error("Formato inesperado de resposta da API (boards)");
       }
 
-      let allCards = [];
-
       for (const board of boards) {
         const cardsUrl = `https://cnc.kanbanize.com/api/v2/boards/${board.board_id}/cards`;
         const cardsResponse = await axios.get(cardsUrl, { headers });
-        if (Array.isArray(cardsResponse.data)) {
-          allCards = allCards.concat(cardsResponse.data);
+        const cards = cardsResponse.data;
+
+        if (Array.isArray(cards)) {
+          const encontrado = cards.find(card =>
+            card.title.toLowerCase().includes(projetoNome.toLowerCase())
+          );
+          if (encontrado) {
+            projeto = encontrado;
+            break;
+          }
         }
       }
-
-      projeto = allCards.find(card =>
-        card.title.toLowerCase().includes(projetoInput.toLowerCase())
-      );
     }
 
     if (!projeto) {
@@ -59,25 +57,26 @@ async function buscarStatusProjeto(projetoInput) {
     const subtarefasPendentes = projeto.unfinished_subtask_count || 0;
     const resumo5w2h = projeto.custom_fields?.[0]?.value || "(Resumo 5W2H não preenchido)";
 
-    return `📊 *Status do Projeto: ${projeto.title}*
+    const resposta = `📊 *Status do Projeto: ${projeto.title}*
 
 📌 *Objetivo:* ${projeto.description || "(Sem descrição)"}
 
 📍 *Status atual:* Coluna ${projeto.column_id || "-"}
-
 🗓️ *Período previsto:* ${projeto.initiative_details?.planned_start_date || "-"} até ${projeto.initiative_details?.planned_end_date || "-"}
 
 📋 *Subtarefas:*
 ✅ ${subtarefasConcluidas} finalizadas
 ⏳ ${subtarefasPendentes} pendentes
 
-🧠 *Resumo Estratégico (5W2H)*
-${resumo5w2h}`;
+🧠 *Resumo Estratégico (5W2H)*\n${resumo5w2h}`;
+
+    return resposta;
   } catch (error) {
     console.error("Erro ao buscar status do projeto:", error.response?.data || error.message);
     return "❌ Ocorreu um erro ao consultar o status do projeto.";
   }
 }
+
 
 
 async function enviarMensagem(numero, mensagem) {
