@@ -34,19 +34,21 @@ app.post("/webhook", async (req, res) => {
     const message = changes?.value?.messages?.[0];
 
     if (message && message.text && message.from) {
-      const texto = message.text.body.toLowerCase();
+      const texto = message.text.body.trim().toLowerCase();
       const numero = message.from;
 
-      try {
-        const status = await buscarStatusProjeto(texto);
-        await enviarMensagem(numero, status);
-      } catch (e) {
-        if (texto.length <= 3 || ["oi", "ola", "bom dia", "boa tarde", "boa noite"].some(g => texto.includes(g))) {
-          await enviarMensagem(
-            numero,
-            "Olá! 👋 Me diga o nome do projeto que deseja consultar o status.\nExemplo: app-financeiro, eac, sistema-web..."
-          );
-        } else {
+      const saudacoes = ["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite", "menu"];
+
+      if (saudacoes.some(s => texto.includes(s))) {
+        await enviarMensagem(
+          numero,
+          "Olá! 👋 Me diga o nome do projeto que deseja consultar o status.\nExemplo: *app-financeiro*, *eac*, *sistema-web*..."
+        );
+      } else {
+        try {
+          const status = await buscarStatusProjeto(texto);
+          await enviarMensagem(numero, status);
+        } catch (e) {
           await enviarMensagem(
             numero,
             "❌ Não encontrei esse projeto. Verifique o nome ou envie outro para consulta."
@@ -60,6 +62,7 @@ app.post("/webhook", async (req, res) => {
     res.sendStatus(404);
   }
 });
+
 
 async function enviarMensagem(numero, mensagem) {
   try {
