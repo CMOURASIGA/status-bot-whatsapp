@@ -8,38 +8,48 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
 
-async function buscarStatusProjeto(projetoNome) {
+async function buscarStatusProjeto(projetoInput) {
   try {
     const headers = {
       apikey: process.env.BUSINESSMAP_API_KEY,
       accept: "application/json"
     };
 
-    // 1. Buscar todos os boards disponíveis
-    const boardsUrl = `https://cnc.kanbanize.com/api/v2/boards`;
-    const boardsResponse = await axios.get(boardsUrl, { headers });
-    const boards = boardsResponse.data;
+    const isNumero = !isNaN(projetoInput);
+    let projeto = null;
 
-    if (!Array.isArray(boards)) {
-      throw new Error("Formato inesperado de resposta da API (boards)");
-    }
+    if (isNumero) {
+      // Buscar direto pelo ID
+      const url = `https://cnc.kanbanize.com/api/v2/cards/${projetoInput}`;
+      const response = await axios.get(url, { headers });
 
-    let allCards = [];
-
-    // 2. Buscar todos os cards de cada board
-    for (const board of boards) {
-      const cardsUrl = `https://cnc.kanbanize.com/api/v2/boards/${board.board_id}/cards`;
-      const cardsResponse = await axios.get(cardsUrl, { headers });
-      if (Array.isArray(cardsResponse.data)) {
-        allCards = allCards.concat(cardsResponse.data);
+      if (response.data?.card_id) {
+        projeto = response.data;
       }
-    }
+    } else {
+      // Buscar por título, listando todos os cards de todos os boards
+      const boardsUrl = `https://cnc.kanbanize.com/api/v2/boards`;
+      const boardsResponse = await axios.get(boardsUrl, { headers });
+      const boards = boardsResponse.data;
 
-    // 3. Encontrar o projeto por ID direto ou pelo título (parcial)
-    const projeto = allCards.find(card =>
-      card.card_id.toString() === projetoNome ||
-      card.title.toLowerCase().includes(projetoNome.toLowerCase())
-    );
+      if (!Array.isArray(boards)) {
+        throw new Error("Formato inesperado de resposta da API (boards)");
+      }
+
+      let allCards = [];
+
+      for (const board of boards) {
+        const cardsUrl = `https://cnc.kanbanize.com/api/v2/boards/${board.board_id}/cards`;
+        const cardsResponse = await axios.get(cardsUrl, { headers });
+        if (Array.isArray(cardsResponse.data)) {
+          allCards = allCards.concat(cardsResponse.data);
+        }
+      }
+
+      projeto = allCards.find(card =>
+        card.title.toLowerCase().includes(projetoInput.toLowerCase())
+      );
+    }
 
     if (!projeto) {
       return "❌ Projeto não encontrado na base de dados do Businessmap.";
@@ -49,28 +59,26 @@ async function buscarStatusProjeto(projetoNome) {
     const subtarefasPendentes = projeto.unfinished_subtask_count || 0;
     const resumo5w2h = projeto.custom_fields?.[0]?.value || "(Resumo 5W2H não preenchido)";
 
-    const resposta = `📊 *Status do Projeto: ${projeto.title}*
+    return `📊 *Status do Projeto: ${projeto.title}*
 
-` +
-      `📌 *Objetivo:* ${projeto.description || "(Sem descrição)"}
+📌 *Objetivo:* ${projeto.description || "(Sem descrição)"}
 
-` +
-      `📍 *Status atual:* Coluna ${projeto.column_id || "-"}
-` +
-      `🗓️ *Período previsto:* ${projeto.initiative_details?.planned_start_date || "-"} até ${projeto.initiative_details?.planned_end_date || "-"}
+📍 *Status atual:* Coluna ${projeto.column_id || "-"}
 
-` +
-      `📋 *Subtarefas:*\n✅ ${subtarefasConcluidas} finalizadas\n⏳ ${subtarefasPendentes} pendentes
+🗓️ *Período previsto:* ${projeto.initiative_details?.planned_start_date || "-"} até ${projeto.initiative_details?.planned_end_date || "-"}
 
-` +
-      `🧠 *Resumo Estratégico (5W2H)*\n${resumo5w2h}`;
+📋 *Subtarefas:*
+✅ ${subtarefasConcluidas} finalizadas
+⏳ ${subtarefasPendentes} pendentes
 
-    return resposta;
+🧠 *Resumo Estratégico (5W2H)*
+${resumo5w2h}`;
   } catch (error) {
-    console.error("Erro ao buscar status do projeto:", error);
+    console.error("Erro ao buscar status do projeto:", error.response?.data || error.message);
     return "❌ Ocorreu um erro ao consultar o status do projeto.";
   }
 }
+
 
 async function enviarMensagem(numero, mensagem) {
   try {
