@@ -37,23 +37,19 @@ app.post("/webhook", async (req, res) => {
       const texto = message.text.body.toLowerCase();
       const numero = message.from;
 
-      if (texto.includes("menu")) {
-        await enviarMensagem(
-          numero,
-          "📋 *Menu de Comandos:*\n1. status app-financeiro\n2. mensagem do dia\n3. ajuda"
-        );
-      } else if (texto.includes("mensagem")) {
-        await enviarMensagem(numero, "🌟 Acredite: todo dia é uma nova oportunidade de evoluir!");
-      } else if (texto.includes("ajuda")) {
-        await enviarMensagem(numero, "ℹ️ Digite 'menu' para ver todas as opções disponíveis.");
-      } else {
-        try {
-          const status = await buscarStatusProjeto(texto);
-          await enviarMensagem(numero, status);
-        } catch (e) {
+      try {
+        const status = await buscarStatusProjeto(texto);
+        await enviarMensagem(numero, status);
+      } catch (e) {
+        if (texto.length <= 3 || ["oi", "ola", "bom dia", "boa tarde", "boa noite"].some(g => texto.includes(g))) {
           await enviarMensagem(
             numero,
-            "❓ Não entendi sua mensagem ou o projeto não foi encontrado. Digite *menu* para ver os comandos disponíveis."
+            "Olá! 👋 Me diga o nome do projeto que deseja consultar o status.\nExemplo: app-financeiro, eac, sistema-web..."
+          );
+        } else {
+          await enviarMensagem(
+            numero,
+            "❌ Não encontrei esse projeto. Verifique o nome ou envie outro para consulta."
           );
         }
       }
