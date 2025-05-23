@@ -126,7 +126,7 @@ async function buscarStatusProjeto(projetoNome, numero) {
         }
       });
 
-      const projeto = response.data;
+      const projeto = response.data?.data || response.data;
       estadoAtual.etapa = "completo";
       return montarStatusProjeto(projeto, headers);
     } catch (e) {
