@@ -20,11 +20,15 @@ async function buscarStatusProjeto(projetoNome) {
     };
 
     let projeto = null;
+    let boardId = null;
+    let columnId = null;
 
     if (!isNaN(projetoNome)) {
       const urlDireta = `https://cnc.kanbanize.com/api/v2/cards/${projetoNome}`;
       const resposta = await axios.get(urlDireta, { headers });
       projeto = resposta.data.data;
+      boardId = projeto.board_id;
+      columnId = projeto.column_id;
     } else {
       const boardsUrl = `https://cnc.kanbanize.com/api/v2/boards`;
       const boardsResponse = await axios.get(boardsUrl, { headers });
@@ -45,6 +49,8 @@ async function buscarStatusProjeto(projetoNome) {
           );
           if (encontrado) {
             projeto = encontrado;
+            boardId = board.board_id;
+            columnId = encontrado.column_id;
             break;
           }
         }
@@ -55,6 +61,20 @@ async function buscarStatusProjeto(projetoNome) {
       return "❌ Projeto não encontrado na base de dados do Businessmap.";
     }
 
+    let nomeColuna = projeto.column_id || "-";
+    if (boardId && columnId) {
+      try {
+        const colunasUrl = `https://cnc.kanbanize.com/api/v2/boards/${boardId}/columns`;
+        const colunasResponse = await axios.get(colunasUrl, { headers });
+        const colunas = colunasResponse.data;
+
+        const coluna = colunas.find(c => c.column_id === columnId);
+        if (coluna) nomeColuna = coluna.name;
+      } catch (e) {
+        console.warn("Não foi possível obter o nome da coluna:", e.message);
+      }
+    }
+
     const subtarefasConcluidas = projeto.finished_subtask_count || 0;
     const subtarefasPendentes = projeto.unfinished_subtask_count || 0;
     const resumo5w2h = removerHtmlTags(projeto.custom_fields?.[0]?.value);
@@ -63,7 +83,7 @@ async function buscarStatusProjeto(projetoNome) {
 
 📌 *Objetivo:* ${removerHtmlTags(projeto.description)}
 
-📍 *Status atual:* Coluna ${projeto.column_id || "-"}
+📍 *Status atual:* ${nomeColuna}
 🗓️ *Período previsto:* ${projeto.initiative_details?.planned_start_date || "-"} até ${projeto.initiative_details?.planned_end_date || "-"}
 
 📋 *Subtarefas:*
