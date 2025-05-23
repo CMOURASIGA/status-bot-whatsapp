@@ -140,14 +140,19 @@ async function buscarStatusProjeto(projetoNome, numero) {
 
 async function montarStatusProjeto(projeto, headers) {
   let nomeColuna = projeto.column_id || "-";
-  try {
-    const colunasUrl = `https://cnc.kanbanize.com/api/v2/boards/${projeto.board_id}/columns`;
-    const colunasResponse = await axios.get(colunasUrl, { headers });
-    const colunas = Array.isArray(colunasResponse.data) ? colunasResponse.data : colunasResponse.data?.data || [];
-    const coluna = colunas.find(c => c.column_id === projeto.column_id);
-    if (coluna) nomeColuna = coluna.name;
-  } catch (e) {
-    console.warn("⚠️ Não foi possível obter o nome da coluna:", e.message);
+  if (projeto.board_id) {
+    try {
+      console.log(`🛠️ Buscando colunas do board_id: ${projeto.board_id}`);
+      const colunasUrl = `https://cnc.kanbanize.com/api/v2/boards/${projeto.board_id}/columns`;
+      const colunasResponse = await axios.get(colunasUrl, { headers });
+      const colunas = Array.isArray(colunasResponse.data) ? colunasResponse.data : colunasResponse.data?.data || [];
+      const coluna = colunas.find(c => c.column_id === projeto.column_id);
+      if (coluna) nomeColuna = coluna.name;
+    } catch (e) {
+      console.warn("⚠️ Não foi possível obter o nome da coluna:", e.message);
+    }
+  } else {
+    console.warn("⚠️ board_id indefinido para o projeto.");
   }
 
   const subtarefasConcluidas = projeto.finished_subtask_count || 0;
