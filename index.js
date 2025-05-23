@@ -23,11 +23,13 @@ function normalizarTexto(texto) {
 const estados = {}; // controle de fluxo por número de telefone
 
 async function buscarBoards(headers) {
+  console.log("🔍 Buscando boards...");
   const response = await axios.get("https://cnc.kanbanize.com/api/v2/boards", { headers });
   return response.data;
 }
 
 async function buscarCards(headers) {
+  console.log("🔍 Buscando cards...");
   const response = await axios.get("https://cnc.kanbanize.com/api/v2/cards", { headers });
   return response.data;
 }
@@ -38,7 +40,9 @@ async function buscarStatusProjeto(projetoNome, numero) {
     accept: "application/json"
   };
 
-  // Inicializar estado se ainda não existir
+  console.log(`[${numero}] Etapa atual:`, estados[numero]?.etapa || "início");
+  console.log(`[${numero}] Texto recebido:`, projetoNome);
+
   if (!estados[numero]) {
     if (["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite"].includes(projetoNome)) {
       estados[numero] = { etapa: "aguardando_board" };
@@ -99,7 +103,7 @@ async function montarStatusProjeto(projeto, headers) {
     const coluna = colunas.find(c => c.column_id === projeto.column_id);
     if (coluna) nomeColuna = coluna.name;
   } catch (e) {
-    console.warn("Não foi possível obter o nome da coluna:", e.message);
+    console.warn("⚠️ Não foi possível obter o nome da coluna:", e.message);
   }
 
   const subtarefasConcluidas = projeto.finished_subtask_count || 0;
@@ -120,17 +124,18 @@ async function montarStatusProjeto(projeto, headers) {
 
 🧠 *Resumo Estratégico (5W2H)*
 ${resumo5w2h
-  .replace(/# O que\?/gi, '\n🔹 *O que?*')
-  .replace(/# Por que\?/gi, '\n🔹 *Por que?*')
-  .replace(/# Onde\?/gi, '\n🔹 *Onde?*')
-  .replace(/# Quando\?/gi, '\n🔹 *Quando?*')
-  .replace(/# Quem\?/gi, '\n🔹 *Quem?*')
-  .replace(/# Como\?/gi, '\n🔹 *Como?*')
-  .replace(/# Quanto\?/gi, '\n🔹 *Quanto?*')}`;
+    .replace(/# O que\?/gi, '\n🔹 *O que?*')
+    .replace(/# Por que\?/gi, '\n🔹 *Por que?*')
+    .replace(/# Onde\?/gi, '\n🔹 *Onde?*')
+    .replace(/# Quando\?/gi, '\n🔹 *Quando?*')
+    .replace(/# Quem\?/gi, '\n🔹 *Quem?*')
+    .replace(/# Como\?/gi, '\n🔹 *Como?*')
+    .replace(/# Quanto\?/gi, '\n🔹 *Quanto?*')}`;
 }
 
 async function enviarMensagem(numero, mensagem) {
   try {
+    console.log(`📤 Enviando mensagem para ${numero}...`);
     await axios.post(
       `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}/messages`,
       {
@@ -146,13 +151,15 @@ async function enviarMensagem(numero, mensagem) {
         }
       }
     );
+    console.log("✅ Mensagem enviada com sucesso.");
   } catch (error) {
-    console.error("Erro ao enviar mensagem:", error.response?.data || error.message);
+    console.error("❌ Erro ao enviar mensagem:", error.response?.data || error.message);
   }
 }
 
 app.post("/webhook", async (req, res) => {
   const body = req.body;
+  console.log("[📩 Webhook Recebido]", JSON.stringify(body, null, 2));
 
   if (body.object) {
     const entry = body.entry?.[0];
@@ -162,11 +169,14 @@ app.post("/webhook", async (req, res) => {
     if (message && message.text && message.from) {
       const texto = message.text.body.trim().toLowerCase();
       const numero = message.from;
+      console.log(`📨 Mensagem recebida de ${numero}: ${texto}`);
 
       try {
         const resposta = await buscarStatusProjeto(texto, numero);
+        console.log(`🤖 Resposta gerada: ${resposta}`);
         await enviarMensagem(numero, resposta);
       } catch (e) {
+        console.error(`❌ Erro ao processar mensagem de ${numero}:`, e.stack || e.message);
         await enviarMensagem(numero, "❌ Ocorreu um erro inesperado. Tente novamente mais tarde.");
       }
     }
@@ -184,7 +194,7 @@ app.get("/webhook", (req, res) => {
   const challenge = req.query["hub.challenge"];
 
   if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    console.log("Webhook verificado com sucesso!");
+    console.log("✅ Webhook verificado com sucesso!");
     res.status(200).send(challenge);
   } else {
     res.sendStatus(403);
@@ -192,5 +202,5 @@ app.get("/webhook", (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
 });
