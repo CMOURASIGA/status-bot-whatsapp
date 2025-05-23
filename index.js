@@ -16,6 +16,10 @@ function limparTextoMultilinha(texto) {
   return texto?.replace(/\n+/g, '\n').trim() || "(Não informado)";
 }
 
+function normalizarTexto(texto) {
+  return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
 const saudacoes = ["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite", "e aí", "salve", "tudo bem"];
 
 async function buscarStatusProjeto(projetoNome) {
@@ -56,7 +60,7 @@ async function buscarStatusProjeto(projetoNome) {
 
         if (Array.isArray(cards)) {
           const encontrados = cards.filter(card =>
-            card.title.toLowerCase().includes(projetoNome.toLowerCase())
+            normalizarTexto(card.title).includes(normalizarTexto(projetoNome))
           );
           projetosEncontrados.push(...encontrados.map(card => ({ ...card, board_id: board.board_id })));
         }
