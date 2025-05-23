@@ -40,15 +40,17 @@ async function buscarCards(headers) {
   console.log("🔍 Buscando cards...");
   const response = await axios.get("https://cnc.kanbanize.com/api/v2/cards", { headers });
   console.log("📦 Dados recebidos dos cards:", response.data);
-  const cards = Array.isArray(response.data) ? response.data : response.data?.data || [];
+
+  const cards = response.data?.data || [];
 
   if (!Array.isArray(cards)) {
-    console.error("❌ ERRO: cards não é um array válido!", cards);
+    console.error("❌ ERRO: cards não é um array válido!", response.data);
     throw new Error("Formato inesperado de resposta ao buscar cards");
   }
 
   return cards;
 }
+
 
 async function buscarStatusProjeto(projetoNome, numero) {
   const headers = {
