@@ -12,6 +12,10 @@ function removerHtmlTags(texto) {
   return texto?.replace(/<[^>]*>?/gm, '').trim() || "(Não informado)";
 }
 
+function limparTextoMultilinha(texto) {
+  return texto?.replace(/\n+/g, '\n').trim() || "(Não informado)";
+}
+
 async function buscarStatusProjeto(projetoNome) {
   try {
     const headers = {
@@ -22,6 +26,7 @@ async function buscarStatusProjeto(projetoNome) {
     let projeto = null;
     let boardId = null;
     let columnId = null;
+    let projetosEncontrados = [];
 
     if (!isNaN(projetoNome)) {
       const urlDireta = `https://cnc.kanbanize.com/api/v2/cards/${projetoNome}`;
@@ -44,21 +49,25 @@ async function buscarStatusProjeto(projetoNome) {
         const cards = cardsResponse.data;
 
         if (Array.isArray(cards)) {
-          const encontrado = cards.find(card =>
+          const encontrados = cards.filter(card =>
             card.title.toLowerCase().includes(projetoNome.toLowerCase())
           );
-          if (encontrado) {
-            projeto = encontrado;
-            boardId = board.board_id;
-            columnId = encontrado.column_id;
-            break;
-          }
+          projetosEncontrados.push(...encontrados.map(card => ({ ...card, board_id: board.board_id })));
         }
+      }
+
+      if (projetosEncontrados.length === 1) {
+        projeto = projetosEncontrados[0];
+        boardId = projeto.board_id;
+        columnId = projeto.column_id;
+      } else if (projetosEncontrados.length > 1) {
+        const lista = projetosEncontrados.map(p => `🔹 ${p.title} (ID ${p.card_id})`).join("\n");
+        return `🔍 Foram encontrados múltiplos projetos com esse nome. Qual deseja consultar?\n\n${lista}\n\n*Digite o número do ID do projeto desejado.*`;
       }
     }
 
     if (!projeto) {
-      return "❌ Projeto não encontrado na base de dados do Businessmap.";
+      return "🤖 Tudo bem! Qual projeto deseja o histórico? Envie o nome do projeto ou parte dele.";
     }
 
     let nomeColuna = projeto.column_id || "-";
@@ -77,7 +86,8 @@ async function buscarStatusProjeto(projetoNome) {
 
     const subtarefasConcluidas = projeto.finished_subtask_count || 0;
     const subtarefasPendentes = projeto.unfinished_subtask_count || 0;
-    const resumo5w2h = removerHtmlTags(projeto.custom_fields?.[0]?.value);
+    const resumo5w2hBruto = projeto.custom_fields?.[0]?.value || "";
+    const resumo5w2h = limparTextoMultilinha(removerHtmlTags(resumo5w2hBruto));
 
     const resposta = `📊 *Status do Projeto: ${removerHtmlTags(projeto.title)}*
 
