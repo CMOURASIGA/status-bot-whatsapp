@@ -89,6 +89,12 @@ async function buscarStatusProjeto(projetoNome, numero) {
 
   if (estadoAtual.etapa === "aguardando_projeto") {
     let cards = await buscarCards(headers);
+
+    console.log(`📋 Projetos retornados do board ${estadoAtual.board_id}:`);
+    cards
+      .filter(card => card.board_id === estadoAtual.board_id)
+      .forEach(card => console.log(`→ ${card.card_id} | ${card.title}`));
+
     let cardsFiltrados = cards.filter(card =>
       card.board_id === estadoAtual.board_id &&
       normalizarTexto(card.title).includes(normalizarTexto(projetoNome))
@@ -98,6 +104,9 @@ async function buscarStatusProjeto(projetoNome, numero) {
     if (workflowsPermitidos) {
       cardsFiltrados = cardsFiltrados.filter(card => workflowsPermitidos.includes(card.workflow_id));
     }
+
+    console.log(`🔎 Buscando por termo: "${normalizarTexto(projetoNome)}"`);
+    console.log(`✅ Projetos encontrados: ${cardsFiltrados.map(p => p.card_id).join(", ") || "nenhum"}`);
 
     if (cardsFiltrados.length === 0) {
       return "❌ Nenhum projeto encontrado com esse nome para essa equipe.";
@@ -120,10 +129,7 @@ async function buscarStatusProjeto(projetoNome, numero) {
 
     try {
       const response = await axios.get(`https://cnc.kanbanize.com/api/v2/cards/${id}`, {
-        headers: {
-          apikey: process.env.BUSINESSMAP_API_KEY,
-          accept: "application/json"
-        }
+        headers
       });
 
       const projeto = response.data?.data || response.data;
@@ -142,7 +148,6 @@ async function montarStatusProjeto(projeto, headers) {
   let nomeColuna = projeto.column_id || "-";
   if (projeto.board_id) {
     try {
-      console.log(`🛠️ Buscando colunas do board_id: ${projeto.board_id}`);
       const colunasUrl = `https://cnc.kanbanize.com/api/v2/boards/${projeto.board_id}/columns`;
       const colunasResponse = await axios.get(colunasUrl, { headers });
       const colunas = Array.isArray(colunasResponse.data) ? colunasResponse.data : colunasResponse.data?.data || [];
@@ -151,8 +156,6 @@ async function montarStatusProjeto(projeto, headers) {
     } catch (e) {
       console.warn("⚠️ Não foi possível obter o nome da coluna:", e.message);
     }
-  } else {
-    console.warn("⚠️ board_id indefinido para o projeto.");
   }
 
   const subtarefasConcluidas = projeto.finished_subtask_count || 0;
