@@ -26,7 +26,6 @@ async function buscarBoards(headers) {
   console.log("🔍 Buscando boards...");
   const response = await axios.get("https://cnc.kanbanize.com/api/v2/boards", { headers });
   console.log("📦 Dados recebidos dos boards:", response.data);
-
   const boards = Array.isArray(response.data) ? response.data : response.data?.data || [];
 
   if (!Array.isArray(boards)) {
@@ -40,7 +39,15 @@ async function buscarBoards(headers) {
 async function buscarCards(headers) {
   console.log("🔍 Buscando cards...");
   const response = await axios.get("https://cnc.kanbanize.com/api/v2/cards", { headers });
-  return Array.isArray(response.data) ? response.data : response.data?.data || [];
+  console.log("📦 Dados recebidos dos cards:", response.data);
+  const cards = Array.isArray(response.data) ? response.data : response.data?.data || [];
+
+  if (!Array.isArray(cards)) {
+    console.error("❌ ERRO: cards não é um array válido!", cards);
+    throw new Error("Formato inesperado de resposta ao buscar cards");
+  }
+
+  return cards;
 }
 
 async function buscarStatusProjeto(projetoNome, numero) {
