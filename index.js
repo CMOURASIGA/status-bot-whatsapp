@@ -21,7 +21,6 @@ async function buscarStatusProjeto(projetoNome) {
 
     let projeto = null;
 
-    // Se for número, tenta buscar como card_id direto
     if (!isNaN(projetoNome)) {
       const urlDireta = `https://cnc.kanbanize.com/api/v2/cards/${projetoNome}`;
       const resposta = await axios.get(urlDireta, { headers });
@@ -58,7 +57,7 @@ async function buscarStatusProjeto(projetoNome) {
 
     const subtarefasConcluidas = projeto.finished_subtask_count || 0;
     const subtarefasPendentes = projeto.unfinished_subtask_count || 0;
-    const resumo5w2h = projeto.custom_fields?.[0]?.value || "(Resumo 5W2H não preenchido)";
+    const resumo5w2h = removerHtmlTags(projeto.custom_fields?.[0]?.value);
 
     const resposta = `📊 *Status do Projeto: ${removerHtmlTags(projeto.title)}*
 
@@ -72,7 +71,14 @@ async function buscarStatusProjeto(projetoNome) {
 ⏳ ${subtarefasPendentes} pendentes
 
 🧠 *Resumo Estratégico (5W2H)*
-${removerHtmlTags(resumo5w2h)}`;
+${resumo5w2h
+  .replace(/# O que\?/gi, '\n🔹 *O que?*')
+  .replace(/# Por que\?/gi, '\n🔹 *Por que?*')
+  .replace(/# Onde\?/gi, '\n🔹 *Onde?*')
+  .replace(/# Quando\?/gi, '\n🔹 *Quando?*')
+  .replace(/# Quem\?/gi, '\n🔹 *Quem?*')
+  .replace(/# Como\?/gi, '\n🔹 *Como?*')
+  .replace(/# Quanto\?/gi, '\n🔹 *Quanto?*')}`;
 
     return resposta;
   } catch (error) {
