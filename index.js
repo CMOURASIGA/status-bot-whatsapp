@@ -16,8 +16,14 @@ function limparTextoMultilinha(texto) {
   return texto?.replace(/\n+/g, '\n').trim() || "(Não informado)";
 }
 
+const saudacoes = ["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite", "e aí", "salve", "tudo bem"];
+
 async function buscarStatusProjeto(projetoNome) {
   try {
+    if (saudacoes.includes(projetoNome.toLowerCase())) {
+      return "🤖 Tudo bem! Qual projeto deseja o histórico?\nEnvie o nome completo ou parte do nome que eu procuro pra você.";
+    }
+
     const headers = {
       apikey: process.env.BUSINESSMAP_API_KEY,
       accept: "application/json"
@@ -67,7 +73,7 @@ async function buscarStatusProjeto(projetoNome) {
     }
 
     if (!projeto) {
-      return "🤖 Tudo bem! Qual projeto deseja o histórico? Envie o nome do projeto ou parte dele.";
+      return "❌ Projeto não encontrado na base de dados do Businessmap.";
     }
 
     let nomeColuna = projeto.column_id || "-";
