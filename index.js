@@ -21,46 +21,25 @@ function normalizarTexto(texto) {
 
 const estados = {};
 
+const workflowsEstrategicosPorBoard = {
+  1: [2],
+  //2: [3],
+  //3: [7]
+};
+
 async function buscarBoards(headers) {
-  console.log("🔍 Buscando boards...");
   const response = await axios.get("https://cnc.kanbanize.com/api/v2/boards", { headers });
-  const boards = Array.isArray(response.data) ? response.data : response.data?.data || [];
-  return boards;
+  return Array.isArray(response.data) ? response.data : response.data?.data || [];
 }
 
 async function buscarCards(headers) {
-  console.log("🔍 Buscando cards...");
   const response = await axios.get("https://cnc.kanbanize.com/api/v2/cards", { headers });
   const cards = response.data?.data?.data || [];
-
   if (!Array.isArray(cards)) {
-    console.error("❌ ERRO: cards não é um array válido!", response.data);
     throw new Error("Formato inesperado de resposta ao buscar cards");
   }
-
   return cards;
 }
-
-async function buscarWorkflowEstrategico(headers, boardId) {
-  if (boardId !== 1) return null;
-
-  try {
-    const url = `https://cnc.kanbanize.com/api/v2/boards/${boardId}/currentStructure`;
-    const response = await axios.get(url, { headers });
-    const lanes = response.data?.lanes || {};
-
-    const workflows = Object.values(lanes)
-      .filter(lane => lane.name.toLowerCase().includes("estratégico"))
-      .map(lane => lane.workflow_id);
-
-    console.log(`🎯 Workflows estratégicos encontrados:`, workflows);
-    return workflows;
-  } catch (err) {
-    console.error("❌ Erro ao buscar estrutura do board:", err.message);
-    return null;
-  }
-}
-
 
 async function buscarStatusProjeto(projetoNome, numero) {
   const headers = {
@@ -68,10 +47,6 @@ async function buscarStatusProjeto(projetoNome, numero) {
     accept: "application/json"
   };
 
-  console.log(`[${numero}] Etapa atual:`, estados[numero]?.etapa || "início");
-  console.log(`[${numero}] Texto recebido:`, projetoNome);
-
-  // Reinicializa o estado com nova saudação a qualquer momento
   if (["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite"].includes(projetoNome)) {
     estados[numero] = { etapa: "aguardando_board" };
     const boards = await buscarBoards(headers);
@@ -97,11 +72,9 @@ async function buscarStatusProjeto(projetoNome, numero) {
       normalizarTexto(card.title).includes(normalizarTexto(projetoNome))
     );
 
-    if (estadoAtual.board_id === 1) {
-      const workflowsEstrategicos = await buscarWorkflowEstrategico(headers, 1);
-      if (workflowsEstrategicos) {
-        cardsFiltrados = cardsFiltrados.filter(card => workflowsEstrategicos.includes(card.workflow_id));
-      }
+    const workflowsPermitidos = workflowsEstrategicosPorBoard[estadoAtual.board_id] || null;
+    if (workflowsPermitidos) {
+      cardsFiltrados = cardsFiltrados.filter(card => workflowsPermitidos.includes(card.workflow_id));
     }
 
     if (cardsFiltrados.length === 0) {
@@ -150,13 +123,13 @@ async function montarStatusProjeto(projeto, headers) {
 📌 *Objetivo:* ${removerHtmlTags(projeto.description)}
 
 📍 *Status atual:* ${nomeColuna}
-🗓️ *Período previsto:* ${projeto.initiative_details?.planned_start_date || "-"} até ${projeto.initiative_details?.planned_end_date || "-"}
+📋 *Período previsto:* ${projeto.initiative_details?.planned_start_date || "-"} até ${projeto.initiative_details?.planned_end_date || "-"}
 
 📋 *Subtarefas:*
 ✅ ${subtarefasConcluidas} finalizadas
 ⏳ ${subtarefasPendentes} pendentes
 
-🧠 *Resumo Estratégico (5W2H)*
+🧐 *Resumo Estratégico (5W2H)*
 ${resumo5w2h
     .replace(/# O que\?/gi, '\n🔹 *O que?*')
     .replace(/# Por que\?/gi, '\n🔹 *Por que?*')
