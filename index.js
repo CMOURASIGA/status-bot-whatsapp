@@ -20,18 +20,27 @@ function normalizarTexto(texto) {
   return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
-const estados = {}; // controle de fluxo por número de telefone
+const estados = {};
 
 async function buscarBoards(headers) {
   console.log("🔍 Buscando boards...");
   const response = await axios.get("https://cnc.kanbanize.com/api/v2/boards", { headers });
-  return response.data;
+  console.log("📦 Dados recebidos dos boards:", response.data);
+
+  const boards = Array.isArray(response.data) ? response.data : response.data?.data || [];
+
+  if (!Array.isArray(boards)) {
+    console.error("❌ ERRO: boards não é um array válido!", boards);
+    throw new Error("Formato inesperado de resposta ao buscar boards");
+  }
+
+  return boards;
 }
 
 async function buscarCards(headers) {
   console.log("🔍 Buscando cards...");
   const response = await axios.get("https://cnc.kanbanize.com/api/v2/cards", { headers });
-  return response.data;
+  return Array.isArray(response.data) ? response.data : response.data?.data || [];
 }
 
 async function buscarStatusProjeto(projetoNome, numero) {
