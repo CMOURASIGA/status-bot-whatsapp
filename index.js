@@ -19,6 +19,28 @@ function normalizarTexto(texto) {
   return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
+async function enviarMensagem(numero, mensagem) {
+  try {
+    await axios.post(
+      `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}/messages`,
+      {
+        messaging_product: "whatsapp",
+        to: numero,
+        type: "text",
+        text: { body: mensagem }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
+          "Content-Type": "application/json"
+        }
+      }
+    );
+  } catch (error) {
+    console.error("❌ Erro ao enviar mensagem:", error.response?.data || error.message);
+  }
+}
+
 const estados = {};
 
 const workflowsEstrategicosPorBoard = {
