@@ -20,86 +20,94 @@ function normalizarTexto(texto) {
   return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
-const saudacoes = ["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite", "e aí", "salve", "tudo bem"];
+const estados = {}; // controle de fluxo por número de telefone
 
-async function buscarStatusProjeto(projetoNome) {
-  try {
-    if (saudacoes.includes(projetoNome.toLowerCase())) {
-      return "🤖 Tudo bem! Qual projeto deseja o histórico?\nEnvie o nome completo ou parte do nome que eu procuro pra você.";
+async function buscarBoards(headers) {
+  const response = await axios.get("https://cnc.kanbanize.com/api/v2/boards", { headers });
+  return response.data;
+}
+
+async function buscarCards(headers) {
+  const response = await axios.get("https://cnc.kanbanize.com/api/v2/cards", { headers });
+  return response.data;
+}
+
+async function buscarStatusProjeto(projetoNome, numero) {
+  const headers = {
+    apikey: process.env.BUSINESSMAP_API_KEY,
+    accept: "application/json"
+  };
+
+  // Inicializar estado se ainda não existir
+  if (!estados[numero]) {
+    if (["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite"].includes(projetoNome)) {
+      estados[numero] = { etapa: "aguardando_board" };
+      const boards = await buscarBoards(headers);
+      const listaBoards = boards.map(b => `🔹 ${b.name} (ID ${b.board_id})`).join("\n");
+      return `🤖 Tudo bem! Qual equipe deseja consultar?\n${listaBoards}\n\n*Responda com o número do ID da equipe.*`;
     }
+    return "❌ Envie uma saudação para começar (ex: 'Oi').";
+  }
 
-    const headers = {
-      apikey: process.env.BUSINESSMAP_API_KEY,
-      accept: "application/json"
-    };
+  const estadoAtual = estados[numero];
 
-    let projeto = null;
-    let boardId = null;
-    let columnId = null;
-    let projetosEncontrados = [];
+  if (estadoAtual.etapa === "aguardando_board") {
+    const boardId = parseInt(projetoNome);
+    if (isNaN(boardId)) return "❌ Por favor, envie apenas o número do ID da equipe.";
+    estadoAtual.board_id = boardId;
+    estadoAtual.etapa = "aguardando_projeto";
+    return `Equipe registrada! Agora, me diga o nome do projeto que deseja consultar.`;
+  }
 
-    if (!isNaN(projetoNome)) {
-      const urlDireta = `https://cnc.kanbanize.com/api/v2/cards/${projetoNome}`;
-      const resposta = await axios.get(urlDireta, { headers });
-      projeto = resposta.data.data;
-      boardId = projeto.board_id;
-      columnId = projeto.column_id;
+  if (estadoAtual.etapa === "aguardando_projeto") {
+    const cards = await buscarCards(headers);
+    const cardsFiltrados = cards.filter(card =>
+      card.board_id === estadoAtual.board_id &&
+      normalizarTexto(card.title).includes(normalizarTexto(projetoNome))
+    );
+
+    if (cardsFiltrados.length === 0) {
+      return "❌ Nenhum projeto encontrado com esse nome para essa equipe.";
+    } else if (cardsFiltrados.length === 1) {
+      estadoAtual.etapa = "completo";
+      return montarStatusProjeto(cardsFiltrados[0], headers);
     } else {
-      const boardsUrl = `https://cnc.kanbanize.com/api/v2/boards`;
-      const boardsResponse = await axios.get(boardsUrl, { headers });
-      const boards = boardsResponse.data;
-
-      if (!Array.isArray(boards)) {
-        throw new Error("Formato inesperado de resposta da API (boards)");
-      }
-
-      for (const board of boards) {
-        const cardsUrl = `https://cnc.kanbanize.com/api/v2/boards/${board.board_id}/cards`;
-        const cardsResponse = await axios.get(cardsUrl, { headers });
-        const cards = cardsResponse.data;
-
-        if (Array.isArray(cards)) {
-          const encontrados = cards.filter(card =>
-            normalizarTexto(card.title).includes(normalizarTexto(projetoNome))
-          );
-          projetosEncontrados.push(...encontrados.map(card => ({ ...card, board_id: board.board_id })));
-        }
-      }
-
-      if (projetosEncontrados.length === 1) {
-        projeto = projetosEncontrados[0];
-        boardId = projeto.board_id;
-        columnId = projeto.column_id;
-      } else if (projetosEncontrados.length > 1) {
-        const lista = projetosEncontrados.map(p => `🔹 ${p.title} (ID ${p.card_id})`).join("\n");
-        return `🔍 Foram encontrados múltiplos projetos com esse nome. Qual deseja consultar?\n\n${lista}\n\n*Digite o número do ID do projeto desejado.*`;
-      }
+      const lista = cardsFiltrados.map(p => `🔹 ${p.title} (ID ${p.card_id})`).join("\n");
+      estadoAtual.etapa = "aguardando_id";
+      estadoAtual.lista_projetos = cardsFiltrados;
+      return `Encontrei vários projetos com esse nome. Qual deseja consultar?\n\n${lista}\n\n*Responda com o número do ID do projeto.*`;
     }
+  }
 
-    if (!projeto) {
-      return "❌ Projeto não encontrado na base de dados do Businessmap.";
-    }
+  if (estadoAtual.etapa === "aguardando_id") {
+    const id = parseInt(projetoNome);
+    const projeto = estadoAtual.lista_projetos.find(p => p.card_id === id);
+    if (!projeto) return "❌ ID inválido. Tente novamente com um dos IDs listados.";
+    estadoAtual.etapa = "completo";
+    return montarStatusProjeto(projeto, headers);
+  }
 
-    let nomeColuna = projeto.column_id || "-";
-    if (boardId && columnId) {
-      try {
-        const colunasUrl = `https://cnc.kanbanize.com/api/v2/boards/${boardId}/columns`;
-        const colunasResponse = await axios.get(colunasUrl, { headers });
-        const colunas = colunasResponse.data;
+  return "❌ Conversa finalizada. Envie 'oi' para começar novamente.";
+}
 
-        const coluna = colunas.find(c => c.column_id === columnId);
-        if (coluna) nomeColuna = coluna.name;
-      } catch (e) {
-        console.warn("Não foi possível obter o nome da coluna:", e.message);
-      }
-    }
+async function montarStatusProjeto(projeto, headers) {
+  let nomeColuna = projeto.column_id || "-";
+  try {
+    const colunasUrl = `https://cnc.kanbanize.com/api/v2/boards/${projeto.board_id}/columns`;
+    const colunasResponse = await axios.get(colunasUrl, { headers });
+    const colunas = colunasResponse.data;
+    const coluna = colunas.find(c => c.column_id === projeto.column_id);
+    if (coluna) nomeColuna = coluna.name;
+  } catch (e) {
+    console.warn("Não foi possível obter o nome da coluna:", e.message);
+  }
 
-    const subtarefasConcluidas = projeto.finished_subtask_count || 0;
-    const subtarefasPendentes = projeto.unfinished_subtask_count || 0;
-    const resumo5w2hBruto = projeto.custom_fields?.[0]?.value || "";
-    const resumo5w2h = limparTextoMultilinha(removerHtmlTags(resumo5w2hBruto));
+  const subtarefasConcluidas = projeto.finished_subtask_count || 0;
+  const subtarefasPendentes = projeto.unfinished_subtask_count || 0;
+  const resumo5w2hBruto = projeto.custom_fields?.[0]?.value || "";
+  const resumo5w2h = limparTextoMultilinha(removerHtmlTags(resumo5w2hBruto));
 
-    const resposta = `📊 *Status do Projeto: ${removerHtmlTags(projeto.title)}*
+  return `📊 *Status do Projeto: ${removerHtmlTags(projeto.title)}*
 
 📌 *Objetivo:* ${removerHtmlTags(projeto.description)}
 
@@ -119,12 +127,6 @@ ${resumo5w2h
   .replace(/# Quem\?/gi, '\n🔹 *Quem?*')
   .replace(/# Como\?/gi, '\n🔹 *Como?*')
   .replace(/# Quanto\?/gi, '\n🔹 *Quanto?*')}`;
-
-    return resposta;
-  } catch (error) {
-    console.error("Erro ao buscar status do projeto:", error.response?.data || error.message);
-    return "❌ Ocorreu um erro ao consultar o status do projeto.";
-  }
 }
 
 async function enviarMensagem(numero, mensagem) {
@@ -162,8 +164,8 @@ app.post("/webhook", async (req, res) => {
       const numero = message.from;
 
       try {
-        const status = await buscarStatusProjeto(texto);
-        await enviarMensagem(numero, status);
+        const resposta = await buscarStatusProjeto(texto, numero);
+        await enviarMensagem(numero, resposta);
       } catch (e) {
         await enviarMensagem(numero, "❌ Ocorreu um erro inesperado. Tente novamente mais tarde.");
       }
