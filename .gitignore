@@ -1,6 +1,7 @@
 # Ignorar arquivos sensíveis
 .env
 credentials.json
-
+# .gitignore
+test-whatsapp.http
 # Pastas geradas automaticamente
 node_modules
