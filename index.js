@@ -1,6 +1,5 @@
 const express = require("express");
 const axios = require("axios");
-const cron = require("node-cron");
 require("dotenv/config");
 
 const app = express();
@@ -25,22 +24,13 @@ const estados = {};
 async function buscarBoards(headers) {
   console.log("🔍 Buscando boards...");
   const response = await axios.get("https://cnc.kanbanize.com/api/v2/boards", { headers });
-  console.log("📦 Dados recebidos dos boards:", response.data);
   const boards = Array.isArray(response.data) ? response.data : response.data?.data || [];
-
-  if (!Array.isArray(boards)) {
-    console.error("❌ ERRO: boards não é um array válido!", boards);
-    throw new Error("Formato inesperado de resposta ao buscar boards");
-  }
-
   return boards;
 }
 
 async function buscarCards(headers) {
   console.log("🔍 Buscando cards...");
   const response = await axios.get("https://cnc.kanbanize.com/api/v2/cards", { headers });
-  console.log("📦 Dados recebidos dos cards:", JSON.stringify(response.data, null, 2));
-
   const cards = response.data?.data?.data || [];
 
   if (!Array.isArray(cards)) {
@@ -51,7 +41,24 @@ async function buscarCards(headers) {
   return cards;
 }
 
+async function buscarLanesEstrategicas(headers, boardId) {
+  if (boardId !== 1) return null;
 
+  try {
+    const url = `https://cnc.kanbanize.com/api/v2/boards/${boardId}/currentStructure`;
+    const response = await axios.get(url, { headers });
+    const lanes = response.data?.lanes || {};
+    const lanesEstrategicas = Object.values(lanes)
+      .filter(lane => lane.name.toLowerCase().includes("estratégico"))
+      .map(lane => lane.lane_id);
+
+    console.log(`🎯 Lanes estratégicas encontradas:`, lanesEstrategicas);
+    return lanesEstrategicas;
+  } catch (err) {
+    console.error("❌ Erro ao buscar estrutura do board:", err.message);
+    return null;
+  }
+}
 
 async function buscarStatusProjeto(projetoNome, numero) {
   const headers = {
@@ -62,17 +69,16 @@ async function buscarStatusProjeto(projetoNome, numero) {
   console.log(`[${numero}] Etapa atual:`, estados[numero]?.etapa || "início");
   console.log(`[${numero}] Texto recebido:`, projetoNome);
 
-  if (!estados[numero]) {
-    if (["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite"].includes(projetoNome)) {
-      estados[numero] = { etapa: "aguardando_board" };
-      const boards = await buscarBoards(headers);
-      const listaBoards = boards.map(b => `🔹 ${b.name} (ID ${b.board_id})`).join("\n");
-      return `🤖 Tudo bem! Qual equipe deseja consultar?\n${listaBoards}\n\n*Responda com o número do ID da equipe.*`;
-    }
-    return "❌ Envie uma saudação para começar (ex: 'Oi').";
+  // Reinicializa o estado com nova saudação a qualquer momento
+  if (["oi", "olá", "ola", "bom dia", "boa tarde", "boa noite"].includes(projetoNome)) {
+    estados[numero] = { etapa: "aguardando_board" };
+    const boards = await buscarBoards(headers);
+    const listaBoards = boards.map(b => `🔹 ${b.name} (ID ${b.board_id})`).join("\n");
+    return `🤖 Tudo bem! Qual equipe deseja consultar?\n${listaBoards}\n\n*Responda com o número do ID da equipe.*`;
   }
 
   const estadoAtual = estados[numero];
+  if (!estadoAtual) return "❌ Envie uma saudação para começar (ex: 'Oi').";
 
   if (estadoAtual.etapa === "aguardando_board") {
     const boardId = parseInt(projetoNome);
@@ -83,11 +89,18 @@ async function buscarStatusProjeto(projetoNome, numero) {
   }
 
   if (estadoAtual.etapa === "aguardando_projeto") {
-    const cards = await buscarCards(headers);
-    const cardsFiltrados = cards.filter(card =>
+    let cards = await buscarCards(headers);
+    let cardsFiltrados = cards.filter(card =>
       card.board_id === estadoAtual.board_id &&
       normalizarTexto(card.title).includes(normalizarTexto(projetoNome))
     );
+
+    if (estadoAtual.board_id === 1) {
+      const lanesEstrategicas = await buscarLanesEstrategicas(headers, 1);
+      if (lanesEstrategicas) {
+        cardsFiltrados = cardsFiltrados.filter(card => lanesEstrategicas.includes(card.lane_id));
+      }
+    }
 
     if (cardsFiltrados.length === 0) {
       return "❌ Nenhum projeto encontrado com esse nome para essa equipe.";
@@ -154,7 +167,6 @@ ${resumo5w2h
 
 async function enviarMensagem(numero, mensagem) {
   try {
-    console.log(`📤 Enviando mensagem para ${numero}...`);
     await axios.post(
       `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}/messages`,
       {
@@ -170,7 +182,6 @@ async function enviarMensagem(numero, mensagem) {
         }
       }
     );
-    console.log("✅ Mensagem enviada com sucesso.");
   } catch (error) {
     console.error("❌ Erro ao enviar mensagem:", error.response?.data || error.message);
   }
@@ -178,8 +189,6 @@ async function enviarMensagem(numero, mensagem) {
 
 app.post("/webhook", async (req, res) => {
   const body = req.body;
-  console.log("[📩 Webhook Recebido]", JSON.stringify(body, null, 2));
-
   if (body.object) {
     const entry = body.entry?.[0];
     const changes = entry?.changes?.[0];
@@ -188,11 +197,9 @@ app.post("/webhook", async (req, res) => {
     if (message && message.text && message.from) {
       const texto = message.text.body.trim().toLowerCase();
       const numero = message.from;
-      console.log(`📨 Mensagem recebida de ${numero}: ${texto}`);
 
       try {
         const resposta = await buscarStatusProjeto(texto, numero);
-        console.log(`🤖 Resposta gerada: ${resposta}`);
         await enviarMensagem(numero, resposta);
       } catch (e) {
         console.error(`❌ Erro ao processar mensagem de ${numero}:`, e.stack || e.message);
@@ -213,7 +220,6 @@ app.get("/webhook", (req, res) => {
   const challenge = req.query["hub.challenge"];
 
   if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    console.log("✅ Webhook verificado com sucesso!");
     res.status(200).send(challenge);
   } else {
     res.sendStatus(403);
