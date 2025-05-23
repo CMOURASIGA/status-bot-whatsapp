@@ -94,115 +94,26 @@ async function buscarStatusProjeto(projetoNome, numero) {
 
   if (estadoAtual.etapa === "aguardando_id") {
     const id = parseInt(projetoNome);
-    const projeto = estadoAtual.lista_projetos.find(p => p.card_id === id);
-    if (!projeto) return "❌ ID inválido. Tente novamente com um dos IDs listados.";
-    estadoAtual.etapa = "completo";
-    return montarStatusProjeto(projeto, headers);
+    if (isNaN(id)) return "❌ O ID informado não é válido.";
+
+    try {
+      const response = await axios.get(`https://cnc.kanbanize.com/api/v2/cards/${id}`, {
+        headers: {
+          apikey: process.env.BUSINESSMAP_API_KEY,
+          accept: "application/json"
+        }
+      });
+
+      const projeto = response.data;
+      estadoAtual.etapa = "completo";
+      return montarStatusProjeto(projeto, headers);
+    } catch (e) {
+      console.error("❌ Erro ao buscar card por ID:", e.message);
+      return "❌ Não foi possível localizar o projeto pelo ID informado.";
+    }
   }
 
   return "❌ Conversa finalizada. Envie 'oi' para começar novamente.";
 }
 
-async function montarStatusProjeto(projeto, headers) {
-  let nomeColuna = projeto.column_id || "-";
-  try {
-    const colunasUrl = `https://cnc.kanbanize.com/api/v2/boards/${projeto.board_id}/columns`;
-    const colunasResponse = await axios.get(colunasUrl, { headers });
-    const colunas = Array.isArray(colunasResponse.data) ? colunasResponse.data : colunasResponse.data?.data || [];
-    const coluna = colunas.find(c => c.column_id === projeto.column_id);
-    if (coluna) nomeColuna = coluna.name;
-  } catch (e) {
-    console.warn("⚠️ Não foi possível obter o nome da coluna:", e.message);
-  }
-
-  const subtarefasConcluidas = projeto.finished_subtask_count || 0;
-  const subtarefasPendentes = projeto.unfinished_subtask_count || 0;
-  const resumo5w2hBruto = projeto.custom_fields?.[0]?.value || "";
-  const resumo5w2h = limparTextoMultilinha(removerHtmlTags(resumo5w2hBruto));
-
-  return `📊 *Status do Projeto: ${removerHtmlTags(projeto.title)}*
-
-📌 *Objetivo:* ${removerHtmlTags(projeto.description)}
-
-📍 *Status atual:* ${nomeColuna}
-📋 *Período previsto:* ${projeto.initiative_details?.planned_start_date || "-"} até ${projeto.initiative_details?.planned_end_date || "-"}
-
-📋 *Subtarefas:*
-✅ ${subtarefasConcluidas} finalizadas
-⏳ ${subtarefasPendentes} pendentes
-
-🧐 *Resumo Estratégico (5W2H)*
-${resumo5w2h
-    .replace(/# O que\?/gi, '\n🔹 *O que?*')
-    .replace(/# Por que\?/gi, '\n🔹 *Por que?*')
-    .replace(/# Onde\?/gi, '\n🔹 *Onde?*')
-    .replace(/# Quando\?/gi, '\n🔹 *Quando?*')
-    .replace(/# Quem\?/gi, '\n🔹 *Quem?*')
-    .replace(/# Como\?/gi, '\n🔹 *Como?*')
-    .replace(/# Quanto\?/gi, '\n🔹 *Quanto?*')}`;
-}
-
-async function enviarMensagem(numero, mensagem) {
-  try {
-    await axios.post(
-      `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}/messages`,
-      {
-        messaging_product: "whatsapp",
-        to: numero,
-        type: "text",
-        text: { body: mensagem }
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`,
-          "Content-Type": "application/json"
-        }
-      }
-    );
-  } catch (error) {
-    console.error("❌ Erro ao enviar mensagem:", error.response?.data || error.message);
-  }
-}
-
-app.post("/webhook", async (req, res) => {
-  const body = req.body;
-  if (body.object) {
-    const entry = body.entry?.[0];
-    const changes = entry?.changes?.[0];
-    const message = changes?.value?.messages?.[0];
-
-    if (message && message.text && message.from) {
-      const texto = message.text.body.trim().toLowerCase();
-      const numero = message.from;
-
-      try {
-        const resposta = await buscarStatusProjeto(texto, numero);
-        await enviarMensagem(numero, resposta);
-      } catch (e) {
-        console.error(`❌ Erro ao processar mensagem de ${numero}:`, e.stack || e.message);
-        await enviarMensagem(numero, "❌ Ocorreu um erro inesperado. Tente novamente mais tarde.");
-      }
-    }
-
-    res.sendStatus(200);
-  } else {
-    res.sendStatus(404);
-  }
-});
-
-app.get("/webhook", (req, res) => {
-  const VERIFY_TOKEN = "meu_token_webhook";
-  const mode = req.query["hub.mode"];
-  const token = req.query["hub.verify_token"];
-  const challenge = req.query["hub.challenge"];
-
-  if (mode === "subscribe" && token === VERIFY_TOKEN) {
-    res.status(200).send(challenge);
-  } else {
-    res.sendStatus(403);
-  }
-});
-
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
-});
+// ... resto do código permanece inalterado ...
