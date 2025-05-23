@@ -41,24 +41,26 @@ async function buscarCards(headers) {
   return cards;
 }
 
-async function buscarLanesEstrategicas(headers, boardId) {
+async function buscarWorkflowEstrategico(headers, boardId) {
   if (boardId !== 1) return null;
 
   try {
     const url = `https://cnc.kanbanize.com/api/v2/boards/${boardId}/currentStructure`;
     const response = await axios.get(url, { headers });
     const lanes = response.data?.lanes || {};
-    const lanesEstrategicas = Object.values(lanes)
-      .filter(lane => lane.name.toLowerCase().includes("estratégico"))
-      .map(lane => lane.lane_id);
 
-    console.log(`🎯 Lanes estratégicas encontradas:`, lanesEstrategicas);
-    return lanesEstrategicas;
+    const workflows = Object.values(lanes)
+      .filter(lane => lane.name.toLowerCase().includes("estratégico"))
+      .map(lane => lane.workflow_id);
+
+    console.log(`🎯 Workflows estratégicos encontrados:`, workflows);
+    return workflows;
   } catch (err) {
     console.error("❌ Erro ao buscar estrutura do board:", err.message);
     return null;
   }
 }
+
 
 async function buscarStatusProjeto(projetoNome, numero) {
   const headers = {
@@ -96,9 +98,9 @@ async function buscarStatusProjeto(projetoNome, numero) {
     );
 
     if (estadoAtual.board_id === 1) {
-      const lanesEstrategicas = await buscarLanesEstrategicas(headers, 1);
-      if (lanesEstrategicas) {
-        cardsFiltrados = cardsFiltrados.filter(card => lanesEstrategicas.includes(card.lane_id));
+      const workflowsEstrategicos = await buscarWorkflowEstrategico(headers, 1);
+      if (workflowsEstrategicos) {
+        cardsFiltrados = cardsFiltrados.filter(card => workflowsEstrategicos.includes(card.workflow_id));
       }
     }
 
