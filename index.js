@@ -23,8 +23,8 @@ const estados = {};
 
 const workflowsEstrategicosPorBoard = {
   1: [2],
-  //2: [3],
-  //3: [7]
+  2: [3],
+  3: [7]
 };
 
 async function buscarBoards(headers) {
@@ -80,8 +80,10 @@ async function buscarStatusProjeto(projetoNome, numero) {
     if (cardsFiltrados.length === 0) {
       return "❌ Nenhum projeto encontrado com esse nome para essa equipe.";
     } else if (cardsFiltrados.length === 1) {
-      estadoAtual.etapa = "completo";
-      return montarStatusProjeto(cardsFiltrados[0], headers);
+      const projeto = cardsFiltrados[0];
+      estadoAtual.etapa = "aguardando_id";
+      estadoAtual.lista_projetos = cardsFiltrados;
+      return `Encontrei 1 projeto com esse nome:\n\n🔹 ${projeto.title} (ID ${projeto.card_id})\n\n*Responda com o número do ID do projeto para ver o status completo.*`;
     } else {
       const lista = cardsFiltrados.map(p => `🔹 ${p.title} (ID ${p.card_id})`).join("\n");
       estadoAtual.etapa = "aguardando_id";
