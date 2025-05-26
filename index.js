@@ -32,8 +32,7 @@ function padronizar5w2h(texto) {
 
 async function enviarMensagem(numero, mensagem) {
   try {
-    console.log("🟡 Enviando payload para o Web App:");
-    console.log(JSON.stringify(payload, null, 2));
+    
     await axios.post(
       `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}/messages`,
       {
@@ -191,21 +190,10 @@ async function montarStatusProjetoComImagem(projeto, headers) {
   const resumo5w2hBruto = projeto.custom_fields?.[0]?.value || "";
   const resumo5w2h = padronizar5w2h(limparTextoMultilinha(removerHtmlTags(resumo5w2hBruto)));
 
-  const payload = {
-    titulo_projeto: removerHtmlTags(projeto.title),
-    status_atual: nomeColuna,
-    periodo_previsto: `${projeto.initiative_details?.planned_start_date || "-"} até ${projeto.initiative_details?.planned_end_date || "-"}`,
-    objetivo: removerHtmlTags(projeto.description),
-    subtarefas_concluidas: `${subtarefasConcluidas}`,
-    subtarefas_pendentes: `${subtarefasPendentes}`,
-    o_que: resumo5w2h.match(/(?<=\*O que\?\*\n)(.*?)(?=\n🔹|\n*$)/s)?.[0] || "-",
-    por_que: resumo5w2h.match(/(?<=\*Por que\?\*\n)(.*?)(?=\n🔹|\n*$)/s)?.[0] || "-",
-    onde: resumo5w2h.match(/(?<=\*Onde\?\*\n)(.*?)(?=\n🔹|\n*$)/s)?.[0] || "-",
-    quando: resumo5w2h.match(/(?<=\*Quando\?\*\n)(.*?)(?=\n🔹|\n*$)/s)?.[0] || "-",
-    quem: resumo5w2h.match(/(?<=\*Quem\?\*\n)(.*?)(?=\n🔹|\n*$)/s)?.[0] || "-",
-    como: resumo5w2h.match(/(?<=\*Como\?\*\n)(.*?)(?=\n🔹|\n*$)/s)?.[0] || "-",
-    quanto: resumo5w2h.match(/(?<=\*Quanto\?\*\n)(.*?)(?=\n🔹|\n*$)/s)?.[0] || "-"
-  };
+  $1
+
+    console.log("🟡 Enviando payload para o Web App:");
+    console.log(JSON.stringify(payload, null, 2));
 
   try {
     const response = await axios.post("https://script.google.com/macros/s/AKfycby8ClXKX1QAq8Mv7V8lX1Cxpavvq5VkICXBIFa1IpgR5xQ5R92N_6Sj9puOp12e4X0Y/exec", payload, {
