@@ -197,8 +197,8 @@ async function montarStatusProjetoComImagem(projeto, headers) {
     objetivo: removerHtmlTags(projeto.description),
     subtarefas_concluidas: subtarefasConcluidas.toString(),
     subtarefas_pendentes: subtarefasPendentes.toString(),
-    o_que: resumo5w2h.split('🔹 *O que?*')[1]?.split('🔹')[0]?.trim() || '',
-    por_que: resumo5w2h.split('🔹 *Por que?*')[1]?.split('🔹')[0]?.trim() || '',
+    oque: resumo5w2h.split('🔹 *O que?*')[1]?.split('🔹')[0]?.trim() || '',
+    porque: resumo5w2h.split('🔹 *Por que?*')[1]?.split('🔹')[0]?.trim() || '',
     onde: resumo5w2h.split('🔹 *Onde?*')[1]?.split('🔹')[0]?.trim() || '',
     quando: resumo5w2h.split('🔹 *Quando?*')[1]?.split('🔹')[0]?.trim() || '',
     quem: resumo5w2h.split('🔹 *Quem?*')[1]?.split('🔹')[0]?.trim() || '',
@@ -207,22 +207,26 @@ async function montarStatusProjetoComImagem(projeto, headers) {
   };
 
   console.log("🟡 Enviando payload para o Web App:");
-    console.log(JSON.stringify(payload, null, 2));
+  console.log(JSON.stringify(payload, null, 2));
 
   try {
-    const response = await axios.post("https://script.google.com/macros/s/AKfycbzjUorcvlaqfXEsnEy91_srUm8kCZU2FFhqJ_xaMnPAo5T7LYF0XUx_vDo_b74XM0Os/exec", payload, {
+    const response = await axios.post("https://script.google.com/macros/s/AKfycby8ClXKX1QAq8Mv7V8lX1Cxpavvq5VkICXBIFa1IpgR5xQ5R92N_6Sj9puOp12e4X0Y/exec", payload, {
       headers: { "Content-Type": "application/json" }
     });
+
+    console.log(`🟢 Status da resposta: ${response.status}`);
+    console.log("📦 Corpo da resposta:", response.data);
 
     const imagem_url = response.data?.imagem_url;
     return imagem_url
       ? `🖼️ Aqui está o status do projeto *${payload.titulo_projeto}*:\n${imagem_url}`
       : `❌ Não foi possível gerar a imagem. Verifique os dados.`;
   } catch (e) {
-    console.error("❌ Erro ao gerar imagem via Web App:", e.message);
+    console.error("❌ Erro ao gerar imagem via Web App:", e.response?.data || e.message);
     return `❌ Erro ao gerar status visual. Tente novamente mais tarde.`;
   }
 }
+
 
 app.post("/webhook", async (req, res) => {
   const body = req.body;
