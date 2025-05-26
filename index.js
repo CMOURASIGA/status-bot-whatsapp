@@ -55,13 +55,29 @@ async function buscarBoards(headers) {
 }
 
 async function buscarCards(headers) {
-  const response = await axios.get("https://cnc.kanbanize.com/api/v2/cards", { headers });
-  const cards = response.data?.data?.data || [];
-  if (!Array.isArray(cards)) {
-    throw new Error("Formato inesperado de resposta ao buscar cards");
+  let todosCards = [];
+  let page = 1;
+  const limit = 100; // você pode ajustar esse valor conforme o limite suportado pela API
+
+  while (true) {
+    const response = await axios.get("https://cnc.kanbanize.com/api/v2/cards", {
+      headers,
+      params: { page, limit }
+    });
+
+    const paginaCards = response.data?.data?.data || [];
+
+    if (!Array.isArray(paginaCards) || paginaCards.length === 0) {
+      break; // saiu do loop se não vierem mais cards
+    }
+
+    todosCards = todosCards.concat(paginaCards);
+    page++;
   }
-  return cards;
+
+  return todosCards;
 }
+
 
 async function buscarStatusProjeto(projetoNome, numero) {
   const headers = {
