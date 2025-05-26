@@ -235,7 +235,7 @@ app.post("/webhook", async (req, res) => {
         const resposta = await buscarStatusProjeto(texto, numero);
         await enviarMensagem(numero, resposta);
       } catch (e) {
-        console.error(`❌ Erro ao processar mensagem de ${numero}:", e.stack || e.message);
+        console.error(`❌ Erro ao processar mensagem de ${numero}:`, e.stack || e.message);
         await enviarMensagem(numero, "❌ Ocorreu um erro inesperado. Tente novamente mais tarde.");
       }
     }
