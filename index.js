@@ -19,6 +19,17 @@ function normalizarTexto(texto) {
   return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
 
+function padronizar5w2h(texto) {
+  return texto
+    .replace(/#\s*O que\?/gi, "\n🔹 *O que?*")
+    .replace(/#\s*Por que\?/gi, "\n🔹 *Por que?*")
+    .replace(/#\s*Onde\?/gi, "\n🔹 *Onde?*")
+    .replace(/#\s*Quando\?/gi, "\n🔹 *Quando?*")
+    .replace(/#\s*Quem\?/gi, "\n🔹 *Quem?*")
+    .replace(/#\s*Como\?/gi, "\n🔹 *Como?*")
+    .replace(/#\s*Quanto\?/gi, "\n🔹 *Quanto?*");
+}
+
 async function enviarMensagem(numero, mensagem) {
   try {
     await axios.post(
@@ -177,7 +188,7 @@ async function montarStatusProjeto(projeto, headers) {
   const subtarefasConcluidas = projeto.finished_subtask_count || 0;
   const subtarefasPendentes = projeto.unfinished_subtask_count || 0;
   const resumo5w2hBruto = projeto.custom_fields?.[0]?.value || "";
-  const resumo5w2h = limparTextoMultilinha(removerHtmlTags(resumo5w2hBruto));
+  const resumo5w2h = padronizar5w2h(limparTextoMultilinha(removerHtmlTags(resumo5w2hBruto)));
 
   return `📊 *Status do Projeto: ${removerHtmlTags(projeto.title)}*
 
@@ -190,15 +201,12 @@ async function montarStatusProjeto(projeto, headers) {
 ✅ ${subtarefasConcluidas} finalizadas
 ⏳ ${subtarefasPendentes} pendentes
 
+📋 *Subtarefas:*
+✅ ${subtarefasConcluidas} finalizadas
+⏳ ${subtarefasPendentes} pendentes
+
 🧐 *Resumo Estratégico (5W2H)*
-${resumo5w2h
-    .replace(/# O que\?/gi, '\n🔹 *O que?*')
-    .replace(/# Por que\?/gi, '\n🔹 *Por que?*')
-    .replace(/# Onde\?/gi, '\n🔹 *Onde?*')
-    .replace(/# Quando\?/gi, '\n🔹 *Quando?*')
-    .replace(/# Quem\?/gi, '\n🔹 *Quem?*')
-    .replace(/# Como\?/gi, '\n🔹 *Como?*')
-    .replace(/# Quanto\?/gi, '\n🔹 *Quanto?*')}`;
+${resumo5w2h}`;
 }
 
 app.post("/webhook", async (req, res) => {
