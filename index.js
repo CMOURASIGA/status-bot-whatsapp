@@ -190,9 +190,23 @@ async function montarStatusProjetoComImagem(projeto, headers) {
   const resumo5w2hBruto = projeto.custom_fields?.[0]?.value || "";
   const resumo5w2h = padronizar5w2h(limparTextoMultilinha(removerHtmlTags(resumo5w2hBruto)));
 
-  $1
+  const payload = {
+    titulo_projeto: removerHtmlTags(projeto.title),
+    status_atual: nomeColuna,
+    periodo_previsto: `${projeto.initiative_details?.planned_start_date || '-'} até ${projeto.initiative_details?.planned_end_date || '-'}`,
+    objetivo: removerHtmlTags(projeto.description),
+    subtarefas_concluidas: subtarefasConcluidas.toString(),
+    subtarefas_pendentes: subtarefasPendentes.toString(),
+    oque: resumo5w2h.split('🔹 *O que?*')[1]?.split('🔹')[0]?.trim() || '',
+    porque: resumo5w2h.split('🔹 *Por que?*')[1]?.split('🔹')[0]?.trim() || '',
+    onde: resumo5w2h.split('🔹 *Onde?*')[1]?.split('🔹')[0]?.trim() || '',
+    quando: resumo5w2h.split('🔹 *Quando?*')[1]?.split('🔹')[0]?.trim() || '',
+    quem: resumo5w2h.split('🔹 *Quem?*')[1]?.split('🔹')[0]?.trim() || '',
+    como: resumo5w2h.split('🔹 *Como?*')[1]?.split('🔹')[0]?.trim() || '',
+    quanto: resumo5w2h.split('🔹 *Quanto?*')[1]?.split('🔹')[0]?.trim() || ''
+  };
 
-    console.log("🟡 Enviando payload para o Web App:");
+  console.log("🟡 Enviando payload para o Web App:");
     console.log(JSON.stringify(payload, null, 2));
 
   try {
