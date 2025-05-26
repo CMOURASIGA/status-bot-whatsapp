@@ -32,6 +32,8 @@ function padronizar5w2h(texto) {
 
 async function enviarMensagem(numero, mensagem) {
   try {
+    console.log("🟡 Enviando payload para o Web App:");
+    console.log(JSON.stringify(payload, null, 2));
     await axios.post(
       `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}/messages`,
       {
