@@ -21,13 +21,13 @@ function normalizarTexto(texto) {
 
 function padronizar5w2h(texto) {
   return texto
-    .replace(/#\s*O que\?/gi, "\n🔹 *O que?*")
-    .replace(/#\s*Por que\?/gi, "\n🔹 *Por que?*")
-    .replace(/#\s*Onde\?/gi, "\n🔹 *Onde?*")
-    .replace(/#\s*Quando\?/gi, "\n🔹 *Quando?*")
-    .replace(/#\s*Quem\?/gi, "\n🔹 *Quem?*")
-    .replace(/#\s*Como\?/gi, "\n🔹 *Como?*")
-    .replace(/#\s*Quanto\?/gi, "\n🔹 *Quanto?*");
+    .replace(/#\s*O que\?/gi, '\n\n🔹 *O que?*')
+    .replace(/#\s*Por que\?/gi, '\n\n🔹 *Por que?*')
+    .replace(/#\s*Onde\?/gi, '\n\n🔹 *Onde?*')
+    .replace(/#\s*Quando\?/gi, '\n\n🔹 *Quando?*')
+    .replace(/#\s*Quem\?/gi, '\n\n🔹 *Quem?*')
+    .replace(/#\s*Como\?/gi, '\n\n🔹 *Como?*')
+    .replace(/#\s*Quanto\?/gi, '\n\n🔹 *Quanto?*');
 }
 
 async function enviarMensagem(numero, mensagem) {
