@@ -210,17 +210,18 @@ async function montarStatusProjetoComImagem(projeto, headers) {
   console.log(JSON.stringify(payload, null, 2));
 
   try {
-    const response = await axios.post("https://script.google.com/macros/s/AKfycbzf68t89E0XxlbX2alLgi3eeuGjzU8_EOsio2zo0Ta-HT4zlewacXUew9Mj1HleInQ/exec", payload, {
+    const response = await axios.post("https://script.google.com/macros/s/AKfycbw8v746PBIle9wfKmXFj8zeaHHUEyo3X60E8sznmEOKozwxxPDCFE9Td0rIzvqHUZKq/exec", payload, {
       headers: { "Content-Type": "application/json" }
     });
 
     console.log(`🟢 Status da resposta: ${response.status}`);
     console.log("📦 Corpo da resposta:", response.data);
 
-    const imagem_url = response.data?.imagem_url;
-    return imagem_url
-      ? `🖼️ Aqui está o status do projeto *${payload.titulo_projeto}*:\n${imagem_url}`
-      : `❌ Não foi possível gerar a imagem. Verifique os dados.`;
+    const slide_url = response.data?.slide_url;
+    return slide_url
+      ? `🖼️ Aqui está o status do projeto *${payload.titulo_projeto}*:\n${slide_url}`
+      : `❌ Não foi possível gerar a apresentação. Verifique os dados.`;
+
   } catch (e) {
     console.error("❌ Erro ao gerar imagem via Web App:", e.response?.data || e.message);
     return `❌ Erro ao gerar status visual. Tente novamente mais tarde.`;
