@@ -1,0 +1,111 @@
+{
+  "name": "Businessmap Summary to WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyWeek",
+              "hour": 9,
+              "minute": 0,
+              "weekDay": 1
+            }
+          ]
+        }
+      },
+      "id": "CronTrigger",
+      "name": "Cron Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://<YOUR_SUBDOMAIN>.kanbanize.com/api/v2/boards/<BOARD_ID>/cards",
+        "method": "GET",
+        "headers": {
+          "header": [
+            {
+              "name": "apikey",
+              "value": "<YOUR_API_KEY>"
+            }
+          ]
+        }
+      },
+      "id": "BusinessmapAPI",
+      "name": "Get Businessmap Cards",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items[0].json.cards.map(card => {\n  const created = new Date(card.creation_date);\n  const updated = new Date(card.last_activity);\n  const durationDays = Math.round((updated - created) / (1000 * 60 * 60 * 24));\n\n  return {\n    json: {\n      title: card.title,\n      assignee: card.assignee,\n      durationDays,\n      status: card.column_name\n    }\n  };\n});"
+      },
+      "id": "ProcessCards",
+      "name": "Process Card Data",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "let msg = '📊 *Resumo Semanal de Projetos*\\n\\n';\n\nitems.forEach(item => {\n  msg += `📝 *${item.json.title}*\\n`;\n  msg += `👤 Responsável: ${item.json.assignee || 'N/A'}\\n`;\n  msg += `📅 Duração: ${item.json.durationDays} dias\\n`;\n  msg += `📌 Status: ${item.json.status}\\n\\n`;\n});\n\nreturn [{ json: { message: msg } }];"
+      },
+      "id": "CreateMessage",
+      "name": "Create WhatsApp Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "authentication": "basicAuth",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/<TWILIO_SID>/Messages.json",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "From",
+              "value": "whatsapp:+14155238886"
+            },
+            {
+              "name": "To",
+              "value": "whatsapp:+55XXXXXXXXXXX"
+            },
+            {
+              "name": "Body",
+              "value": "={{$json[\"message\"]}}"
+            }
+          ]
+        }
+      },
+      "id": "SendWhatsApp",
+      "name": "Send WhatsApp (Twilio)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1050, 300],
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "<TWILIO_CREDENTIAL_ID>",
+          "name": "Twilio API"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron Trigger": {
+      "main": [[{ "node": "Get Businessmap Cards", "type": "main", "index": 0 }]]
+    },
+    "Get Businessmap Cards": {
+      "main": [[{ "node": "Process Card Data", "type": "main", "index": 0 }]]
+    },
+    "Process Card Data": {
+      "main": [[{ "node": "Create WhatsApp Message", "type": "main", "index": 0 }]]
+    },
+    "Create WhatsApp Message": {
+      "main": [[{ "node": "Send WhatsApp (Twilio)", "type": "main", "index": 0 }]]
+    }
+  }
+}

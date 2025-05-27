@@ -1,0 +1,167 @@
+{
+  "name": "Mensagem Multimodal com AI Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "webhook-multimodal",
+        "responseMode": "onReceived"
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": [
+          {
+            "value1": "={{$json[\"body\"][\"type\"]}}",
+            "operation": "equal",
+            "value2": "text"
+          },
+          {
+            "value1": "={{$json[\"body\"][\"type\"]}}",
+            "operation": "equal",
+            "value2": "audio"
+          },
+          {
+            "value1": "={{$json[\"body\"][\"type\"]}}",
+            "operation": "equal",
+            "value2": "image"
+          }
+        ]
+      },
+      "id": "Switch",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fields": {
+          "message": "={{$json[\"body\"][\"text\"]}}"
+        }
+      },
+      "id": "EditText",
+      "name": "Edit Fields - Texto",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        500,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "fields": {
+          "message": "={{$json[\"transcription\"]}}"
+        }
+      },
+      "id": "EditAudio",
+      "name": "Edit Fields - \u00c1udio",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fields": {
+          "message": "Imagem recebida: {{$json[\"body\"][\"url\"]}}"
+        }
+      },
+      "id": "EditImage",
+      "name": "Edit Fields - Imagem",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        500,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "model": "openrouter-chat-simple",
+        "memory": "simple-memory"
+      },
+      "id": "AIAgent",
+      "name": "AI Agent",
+      "type": "n8n-nodes-base.aiAgent",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "text": "={{$json[\"message\"]}}"
+      },
+      "id": "EvolutionAPI",
+      "name": "Evolution API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          "Switch"
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          "EditText",
+          "EditAudio",
+          "EditImage"
+        ]
+      ]
+    },
+    "EditText": {
+      "main": [
+        [
+          "AIAgent"
+        ]
+      ]
+    },
+    "EditAudio": {
+      "main": [
+        [
+          "AIAgent"
+        ]
+      ]
+    },
+    "EditImage": {
+      "main": [
+        [
+          "AIAgent"
+        ]
+      ]
+    },
+    "AIAgent": {
+      "main": [
+        [
+          "EvolutionAPI"
+        ]
+      ]
+    }
+  }
+}

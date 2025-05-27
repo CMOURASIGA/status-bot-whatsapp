@@ -1,0 +1,66 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "url": "https://cnc.kanbanize.com/api/v2/cards/",
+        "responseFormat": "json",
+        "headerParametersJson": "apikey: CAnX3amJLLJKAqfKvlkYBaqGAcYkNMdg6p7CHLRu"
+      },
+      "id": "1",
+      "name": "Get Businessmap Cards",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [300, 200]
+    },
+    {
+      "parameters": {
+        "functionCode": "return items.map(item => {\n  const card = item.json;\n\n  return {\n    json: {\n      fields: {\n        \"Card ID\": card.card_id,\n        \"Título\": card.title,\n        \"Responsável\": card.assignee,\n        \"Status\": card.status,\n        \"Data de Criação\": card.created_date,\n        \"Prioridade\": card.priority,\n        \"Coluna\": card.column_name\n      }\n    }\n  };\n});"
+      },
+      "id": "2",
+      "name": "Map Cards to Airtable Format",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [500, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://api.airtable.com/v0/table_business/table_business",
+        "method": "POST",
+        "responseFormat": "json",
+        "headerParametersJson": "Authorization: Bearer pat3QlqVEXIqVlZKv.2960a7767a303335ade9e907d1fb27312c22fb62a539d8e37fe1b8d983d01e92\nContent-Type: application/json",
+        "jsonParameters": true,
+        "options": {},
+        "bodyParametersJson": "{\n  \"fields\": {\n    \"Card ID\": {{$json[\"fields\"][\"Card ID\"]}},\n    \"Título\": {{$json[\"fields\"][\"Título\"]}},\n    \"Responsável\": {{$json[\"fields\"][\"Responsável\"]}},\n    \"Status\": {{$json[\"fields\"][\"Status\"]}},\n    \"Data de Criação\": {{$json[\"fields\"][\"Data de Criação\"]}},\n    \"Prioridade\": {{$json[\"fields\"][\"Prioridade\"]}},\n    \"Coluna\": {{$json[\"fields\"][\"Coluna\"]}}\n  }\n}"
+      },
+      "id": "3",
+      "name": "Send to Airtable",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [700, 200]
+    }
+  ],
+  "connections": {
+    "Get Businessmap Cards": {
+      "main": [
+        [
+          {
+            "node": "Map Cards to Airtable Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Cards to Airtable Format": {
+      "main": [
+        [
+          {
+            "node": "Send to Airtable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

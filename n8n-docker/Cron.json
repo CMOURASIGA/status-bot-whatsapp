@@ -1,0 +1,26 @@
+{
+  "nodes": [
+	{
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyWeek",
+              "hour": 9,
+              "minute": 0,
+              "weekDay": 1
+            }
+          ]
+        }
+      },
+      "id": "CronTrigger",
+      "name": "Cron Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [250, 300]
+    }	    
+  ]
+}
+
+
+

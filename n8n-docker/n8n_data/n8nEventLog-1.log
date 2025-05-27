@@ -1,0 +1,2 @@
+{"__type":"$$EventMessageAudit","id":"bf1cb0cb-5069-4135-9ba1-fc3de658ef9c","ts":"2025-04-24T16:27:30.399-03:00","eventName":"n8n.audit.workflow.created","message":"n8n.audit.workflow.created","payload":{"userId":"d6130e7f-d2ec-446f-ba71-85210ce9c890","_email":"lauro_otg@cnc.org.br","_firstName":"Teste","_lastName":"Lauro","globalRole":"global:owner","workflowId":"mKKgztvVGzHYnkjC","workflowName":"My workflow"}}
+{"__type":"$$EventMessageConfirm","confirm":"bf1cb0cb-5069-4135-9ba1-fc3de658ef9c","ts":"2025-04-24T16:27:30.462-03:00","source":{"id":"0","name":"eventBus"}}

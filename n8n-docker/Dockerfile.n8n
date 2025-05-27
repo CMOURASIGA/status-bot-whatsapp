@@ -1,0 +1,20 @@
+FROM n8nio/n8n:latest
+
+USER root
+
+# Corrige repositórios e instala pacotes
+RUN mkdir -p /etc/apk && \
+    echo "http://dl-cdn.alpinelinux.org/alpine/v3.21/main" > /etc/apk/repositories && \
+    echo "http://dl-cdn.alpinelinux.org/alpine/v3.21/community" >> /etc/apk/repositories && \
+    apk update && apk add --no-cache \
+        openssl \
+        busybox-extras \
+        curl \
+        ca-certificates \
+        git \
+        graphicsmagick \
+        jq \
+        libc6-compat \
+        openssh \
+        tini \
+        tzdata
