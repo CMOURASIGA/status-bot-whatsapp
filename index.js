@@ -195,7 +195,7 @@ async function montarStatusProjetoComImagem(projeto, headers) {
 
   try {
     const response = await axios.post(
-      "https://cnc.app.n8n.cloud/webhook/54bed773-1e28-434c-b4b8-409a2cd868d7",
+      "https://cnc.app.n8n.cloud/webhook-test/status-projeto/",
       payload,
       { headers: { "Content-Type": "application/json" } }
     );
