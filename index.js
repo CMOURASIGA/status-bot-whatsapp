@@ -32,7 +32,6 @@ function padronizar5w2h(texto) {
 
 async function enviarMensagem(numero, mensagem) {
   try {
-    
     await axios.post(
       `${process.env.WHATSAPP_API_URL}/${process.env.PHONE_NUMBER_ID}/messages`,
       {
@@ -78,10 +77,7 @@ async function buscarCards(headers) {
     });
 
     const paginaCards = response.data?.data?.data || [];
-
-    if (!Array.isArray(paginaCards) || paginaCards.length === 0) {
-      break;
-    }
+    if (!Array.isArray(paginaCards) || paginaCards.length === 0) break;
 
     todosCards = todosCards.concat(paginaCards);
     page++;
@@ -116,14 +112,8 @@ async function buscarStatusProjeto(projetoNome, numero) {
 
   if (estadoAtual.etapa === "aguardando_projeto") {
     let cards = await buscarCards(headers);
-
-    console.log(`📋 Projetos retornados do board ${estadoAtual.board_id}:`);
-    cards
-      .filter(card => card.board_id === estadoAtual.board_id)
-      .forEach(card => console.log(`→ ${card.card_id} | ${card.title}`));
-
+    cards = cards.filter(c => c.board_id === estadoAtual.board_id);
     let cardsFiltrados = cards.filter(card =>
-      card.board_id === estadoAtual.board_id &&
       normalizarTexto(card.title).includes(normalizarTexto(projetoNome))
     );
 
@@ -131,9 +121,6 @@ async function buscarStatusProjeto(projetoNome, numero) {
     if (workflowsPermitidos) {
       cardsFiltrados = cardsFiltrados.filter(card => workflowsPermitidos.includes(card.workflow_id));
     }
-
-    console.log(`🔎 Buscando por termo: "${normalizarTexto(projetoNome)}"`);
-    console.log(`✅ Projetos encontrados: ${cardsFiltrados.map(p => p.card_id).join(", ") || "nenhum"}`);
 
     if (cardsFiltrados.length === 0) {
       return "❌ Nenhum projeto encontrado com esse nome para essa equipe.";
@@ -206,29 +193,24 @@ async function montarStatusProjetoComImagem(projeto, headers) {
     quanto: resumo5w2h.split('🔹 *Quanto?*')[1]?.split('🔹')[0]?.trim() || ''
   };
 
-  console.log("🟡 Enviando payload para o Web App:");
-  console.log(JSON.stringify(payload, null, 2));
-
   try {
-    const response = await axios.post("https://script.google.com/macros/s/AKfycbyWZ_nyDr7rDrfFTlOHWjvjuNOJE1bLyuD0qjBBMx3Zi6c1ssGiVhtQOx9J83Z4SAYe/exec", payload, {
-      headers: { "Content-Type": "application/json" }
-    });
+    const response = await axios.post(
+      "https://cnc.app.n8n.cloud/webhook/54bed773-1e28-434c-b4b8-409a2cd868d7",
+      payload,
+      { headers: { "Content-Type": "application/json" } }
+    );
 
-    console.log(`🟢 Status da resposta: ${response.status}`);
-    console.log("📦 Corpo da resposta:", response.data);
-
-    const slide_url = response.data?.slide_url;
-    return slide_url
-      ? `🖼️ Aqui está o status do projeto *${payload.titulo_projeto}*:\n${slide_url}`
-      : `❌ Não foi possível gerar a apresentação. Verifique os dados.`;
-
+    const imagemUrl = response.data?.imagem_url;
+    return imagemUrl
+      ? `🖼️ Aqui está o status do projeto *${payload.titulo_projeto}*:\n${imagemUrl}`
+      : `❌ Não foi possível gerar a imagem. Verifique os dados.`;
   } catch (e) {
-    console.error("❌ Erro ao gerar imagem via Web App:", e.response?.data || e.message);
-    return `❌ Erro ao gerar status visual. Tente novamente mais tarde.`;
+    console.error("❌ Erro ao chamar webhook do n8n:", e.response?.data || e.message);
+    return "❌ Ocorreu um erro ao gerar a imagem com o status do projeto.";
   }
 }
 
-
+// === Webhook do WhatsApp
 app.post("/webhook", async (req, res) => {
   const body = req.body;
   if (body.object) {
