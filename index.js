@@ -210,7 +210,7 @@ async function montarStatusProjetoComImagem(projeto, headers) {
   console.log(JSON.stringify(payload, null, 2));
 
   try {
-    const response = await axios.post("https://script.google.com/macros/s/AKfycbw8v746PBIle9wfKmXFj8zeaHHUEyo3X60E8sznmEOKozwxxPDCFE9Td0rIzvqHUZKq/exec", payload, {
+    const response = await axios.post("https://script.google.com/macros/s/AKfycbyWZ_nyDr7rDrfFTlOHWjvjuNOJE1bLyuD0qjBBMx3Zi6c1ssGiVhtQOx9J83Z4SAYe/exec", payload, {
       headers: { "Content-Type": "application/json" }
     });
 
