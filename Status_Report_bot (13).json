@@ -1,0 +1,1454 @@
+{
+  "name": "Status-Report_bot",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -5580,
+        -1980
+      ],
+      "id": "ad7935f6-c151-4859-9667-48d70ee34452",
+      "name": "WhatsApp Trigger",
+      "webhookId": "196fd314-2fc1-491a-a29a-b6d8da2eae52",
+      "notesInFlow": false,
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "gMGmyP6REssV6yCQ",
+          "name": "WhatsApp OAuth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const texto = $json.messages[0].text.body?.toLowerCase().trim() || '';\nconst numero = $json.messages[0].from;\n\nconst saudacoes = ['oi', 'olá', 'ola', 'bom dia', 'boa tarde', 'boa noite'];\nlet etapa = null;\nlet tipo_de_analise = null;\nlet projeto_id = null;\n\n// Se for saudação\nif (saudacoes.includes(texto)) {\n  etapa = 'menu_principal';\n}\n\n// Se for \"status\"\nelse if (texto.includes('status')) {\n  etapa = 'aguardando_projeto_id';\n}\n\n// Se for \"análise\" ou \"analise\"\nelse if (texto.includes('análise') || texto.includes('analise')) {\n  etapa = 'modo_analitico';\n}\n\n// Se for número (ID do projeto)\nelse if (!isNaN(texto) && texto.length <= 10) {\n  etapa = 'validando_projeto_id';\n  projeto_id = texto;\n}\n\n// Se estiver no modo analítico ou aguardando pergunta\nelse {\n  etapa = 'aguardando_pergunta_analitica';\n\n  // Detectar intenção da pergunta\n  if (texto.includes('mais atrasado')) {\n    tipo_de_analise = 'projeto_mais_atrasado';\n  } else if (texto.includes('risco')) {\n    tipo_de_analise = 'projetos_em_risco';\n  } else if (texto.includes('crítico') || texto.includes('critico')) {\n    tipo_de_analise = 'projeto_mais_critico';\n  } else if (texto.includes('resumo') || texto.includes('geral')) {\n    tipo_de_analise = 'resumo_geral';\n  } else if (texto.includes('estratégico') || texto.includes('estrategico')) {\n    tipo_de_analise = 'projetos_estrategicos';\n  } else if (texto.includes('em dia') || texto.includes('no prazo')) {\n    tipo_de_analise = 'projetos_em_dia';\n  } else {\n    tipo_de_analise = 'desconhecido';\n  }\n}\n\nreturn [{\n  json: {\n    texto,\n    numero,\n    etapa,\n    projeto_id,\n    tipo_de_analise\n  }\n}];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5360,
+        -1980
+      ],
+      "id": "39901347-2430-42cc-a356-458033c31e3e",
+      "name": "Extrair Texto e Número"
+    },
+    {
+      "parameters": {
+        "jsCode": "const texto = $json.texto?.trim().toLowerCase() || '';\nconst numero = $json.numero || '';\nlet etapa = $json.etapa || null;\n\n// 🚪 Comando para sair\nif (texto === 'sair') {\n  return [{\n    json: {\n      etapa: 'sair',\n      numero,\n      mensagem: '👋 Conversa encerrada. Diga \"oi\" para começar novamente quando quiser.'\n    }\n  }];\n}\n\n// 👋 Início da conversa ou reset\nif (!etapa || texto === 'oi') {\n  return [{\n    json: {\n      etapa: 'menu_principal',\n      numero,\n      mensagem: `🤖 Olá! Como posso te ajudar hoje?\\n\\n❇️ Digite *\"status\"* para ver um projeto específico\\n❇️ Digite *\"análise geral\"* para ver insights e recomendações.`\n    }\n  }];\n}\n\n// 📌 Menu principal\nif (etapa === 'menu_principal') {\n  if (texto.includes('status')) {\n    return [{\n      json: {\n        etapa: 'aguardando_projeto_id',\n        numero,\n        mensagem: '🗂️ Certo! Por favor, digite o ID do projeto que você quer consultar.'\n      }\n    }];\n  }\n\n  if (texto.includes('análise') || texto.includes('analise')) {\n    return [{\n      json: {\n        etapa: 'aguardando_pergunta_analitica',\n        numero,\n        mensagem: `🤖 Agora estou pronto para te ajudar com a análise dos projetos!\\n\\nVocê pode me perguntar, por exemplo:\\n🔹 \"Qual projeto está parado?\"\\n🔹 \"O projeto 941 está atrasado?\"\\n🔹 \"Quais são os estratégicos?\"\\n🔹 \"Me dá um resumo geral\"\\n\\n💬 Escreva com suas palavras! Estou pronto pra responder.`\n      }\n    }];\n  }\n}\n\n// 🔢 ID do projeto\nif (etapa === 'aguardando_projeto_id') {\n  if (!isNaN(texto) && texto !== '') {\n    return [{\n      json: {\n        etapa: 'validando_projeto_id',\n        numero,\n        projeto_id: texto,\n        mensagem: `🔍 Verificando dados do projeto ID: *${texto}*...`\n      }\n    }];\n  } else {\n    return [{\n      json: {\n        etapa: 'aguardando_projeto_id',\n        numero,\n        mensagem: '⚠️ Por favor, digite apenas o número (ID) do projeto.'\n      }\n    }];\n  }\n}\n\n// 🧠 Etapa aguardando pergunta analítica\nif (etapa === 'aguardando_pergunta_analitica') {\n  return [{\n    json: {\n      etapa: 'interpretando_pergunta_analitica',\n      numero,\n      pergunta: texto,\n      mensagem: null\n    }\n  }];\n}\n\n\n\n// 🧭 Fallback\nreturn [{\n  json: {\n    etapa,\n    numero,\n    mensagem: '🤔 Desculpe, não entendi. Poderia tentar novamente? Se precisar, digite *\"oi\"* para recomeçar ou *\"sair\"* para encerrar.'\n  }\n}];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5560,
+        -1740
+      ],
+      "id": "28f562ea-76b1-45cc-9257-719b2f08bd7a",
+      "name": "Gerenciar Etapa da Conversa"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "580996415104401",
+        "recipientPhoneNumber": "={{ $json.numero }}",
+        "textBody": "={{ $json.mensagem }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        -3800,
+        -1760
+      ],
+      "id": "e73a5e89-ed0f-441a-8ca3-5058ff16eaa6",
+      "name": "WhatsApp Business Cloud",
+      "webhookId": "05ccde58-ade5-4df2-86ee-9d981a31f126",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "nmOK50BmNtE58pi2",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const numero = $node[\"Gerenciar Etapa da Conversa\"].json.numero || \"\";\n\n// Acesso correto à lista de projetos\nconst projetos = items[0].json.data.data || [];\n\nlet texto = \"🤖 Tudo bem! Qual projeto deseja consultar?\\n\\n\";\n\n// Montar lista com card_id e título\nprojetos.forEach(proj => {\n  texto += `🆔 ${proj.card_id} - ${proj.title}\\n`;\n});\n\ntexto += \"\\n*Responda com o número do ID do projeto.*\";\n\nreturn [\n  {\n    json: {\n      etapa: \"aguardando_projeto_id\",\n      numero,\n      mensagem: texto\n    }\n  }\n];\n\n\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4040,
+        -1760
+      ],
+      "id": "d48b371f-8b81-4285-8e4f-4e7da9b67edb",
+      "name": "Listar Projetos Disponíveis"
+    },
+    {
+      "parameters": {
+        "jsCode": "const projeto = $input.first().json.data.data?.[0] || {};\nconst resumoBruto = projeto.custom_fields?.[0]?.value || \"\";\n\n// Função para limpar HTML\nfunction limparHtml(texto) {\n  return texto.replace(/<[^>]*>/g, '').trim();\n}\n\n// Função para extrair conteúdo após cada título\nfunction extrairResumo(resumo, tag) {\n  const regex = new RegExp(`# ${tag}\\\\?\\\\s*([^#]*)`, 'i');\n  const match = resumo.match(regex);\n  return match ? match[1].trim() : \"(sem info)\";\n}\n\n// Limpa o HTML e prepara o texto\nconst resumoLimpo = limparHtml(resumoBruto);\n\n// Extrai cada ponto do 5W2H\nconst oQue = extrairResumo(resumoLimpo, \"O que\");\nconst porQue = extrairResumo(resumoLimpo, \"Por que\");\nconst onde = extrairResumo(resumoLimpo, \"Onde\");\nconst quando = extrairResumo(resumoLimpo, \"Quando\");\nconst quem = extrairResumo(resumoLimpo, \"Quem\");\nconst como = extrairResumo(resumoLimpo, \"Como\");\nconst quanto = extrairResumo(resumoLimpo, \"Quanto\");\n\n// Monta a mensagem final\nconst mensagem = \n` *Status do Projeto - ${projeto.title || \"(sem título)\"}*\\n\\n` +\n` *Objetivo:* ${(projeto.description || \"\").replace(/<[^>]*>/g, '').trim() || \"(sem descrição)\"}\\n` +\n` *Período Previsto:* ${projeto.initiative_details?.planned_start_date || \"-\"} até ${projeto.initiative_details?.planned_end_date || \"-\"}\\n\\n` +\n` *Subtarefas Concluídas:* ${projeto.finished_subtask_count ?? 0}\\n` +\n` *Subtarefas Pendentes:* ${projeto.unfinished_subtask_count ?? 0}\\n\\n` +\n` *Resumo 5W2H:*\\n` +\n`🔹 *O que?* ${oQue}\\n` +\n`🔹 *Por que?* ${porQue}\\n` +\n`🔹 *Onde?* ${onde}\\n` +\n`🔹 *Quando?* ${quando}\\n` +\n`🔹 *Quem?* ${quem}\\n` +\n`🔹 *Como?* ${como}\\n` +\n`🔹 *Quanto?* ${quanto}\\n\\n` +\n` Deseja consultar outro projeto? Envie o ID ou digite \"sair\".`;\n\nreturn [{ json: { mensagem } }];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3800,
+        -2180
+      ],
+      "id": "0239f948-65ab-4440-b753-be062d510774",
+      "name": "Responder Detalhes do Projeto"
+    },
+    {
+      "parameters": {
+        "url": "https://cnc.kanbanize.com/api/v2/cards?board_ids=1&workflow_ids=2&fields=card_id,title,description,custom_id,owner_user_id,type_id,size,priority,color,deadline,reporter,created_at,revision,last_modified,in_current_position_since,board_id,workflow_id,column_id,lane_id,section,position,last_column_id,last_lane_id,version_id,archived_at,reason_id,discard_comment,discarded_at,is_blocked,block_reason,current_block_time,current_logged_time,current_cycle_time,child_card_stats,finished_subtask_count,unfinished_subtask_count,comment_count,first_request_time,first_start_time,first_end_time,last_request_time,last_start_time,last_end_time&expand=custom_fields,stickers,tag_ids,co_owner_ids,watcher_ids,attachments,cover_image,checked_column_checklist_items,initiative_details,annotations,subtasks,linked_cards,transitions,block_times,logged_times,logged_times_for_child_cards,lead_time_per_column,outcomes,outcome_current_values",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.BUSINESSMAP_API_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4300,
+        -1940
+      ],
+      "id": "86e89310-2b96-4d45-b0e5-43b243f7b59e",
+      "name": "Buscar Boards no Kanbanize - listagem"
+    },
+    {
+      "parameters": {
+        "url": "=https://cnc.kanbanize.com/api/v2/cards?card_ids={{ $json.projeto_id }}&board_ids=1&workflow_ids=2&fields=card_id,title,description,custom_id,owner_user_id,type_id,size,priority,color,deadline,reporter,created_at,revision,last_modified,in_current_position_since,board_id,workflow_id,column_id,lane_id,section,position,last_column_id,last_lane_id,version_id,archived_at,reason_id,discard_comment,discarded_at,is_blocked,block_reason,current_block_time,current_logged_time,current_cycle_time,child_card_stats,finished_subtask_count,unfinished_subtask_count,comment_count,first_request_time,first_start_time,first_end_time,last_request_time,last_start_time,last_end_time&expand=custom_fields,stickers,tag_ids,co_owner_ids,watcher_ids,attachments,cover_image,checked_column_checklist_items,initiative_details,annotations,subtasks,linked_cards,transitions,block_times,logged_times,logged_times_for_child_cards,lead_time_per_column,outcomes,outcome_current_values",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.BUSINESSMAP_API_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4300,
+        -2240
+      ],
+      "id": "4270ce01-e827-40fb-96fa-f4f4b4172c82",
+      "name": "Buscar Boards no Kanbanize - detalhes"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.etapa }}",
+                    "rightValue": "validando_projeto_id",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "39805fae-b3fd-4d76-a732-9c32dce0c45f"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "validando_projeto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "e7995e8c-8789-4d43-b237-1888c49f1ef3",
+                    "leftValue": "={{ $json.etapa }}",
+                    "rightValue": "aguardando_projeto_id",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "aguardando_projeto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "5b1e362e-603e-4aa4-898d-b98d9cf2cfd4",
+                    "leftValue": "={{ $('Extrair Texto e Número').item.json.texto }}",
+                    "rightValue": "sair",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "sair"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4bea5359-7a3b-4e81-b324-536cc030af14",
+                    "leftValue": "={{ $json.etapa }}",
+                    "rightValue": "modo_analitico",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "modo_analitico"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -4960,
+        -1420
+      ],
+      "id": "02714d3c-98b3-482f-9e9f-b1242fd3ee3d",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "580996415104401",
+        "recipientPhoneNumber": "={{ $json.numero }}",
+        "textBody": "={{ $json.mensagem }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        -4320,
+        -1380
+      ],
+      "id": "63cce6de-81f6-4cbb-81c4-f3dcbf727522",
+      "name": "WhatsApp Business Cloud2",
+      "webhookId": "2491a29a-075a-4756-aada-fab111f1eb84",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "nmOK50BmNtE58pi2",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ae1e8b0c-1923-4227-b9a0-96e469a2e319",
+              "leftValue": "={{ $json.data.data[0].title }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -4080,
+        -2240
+      ],
+      "id": "666dc234-9522-499b-aeaf-3e93d4654a70",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    etapa: 'aguardando_projeto_id',\n    numero: $node[\"Gerenciar Etapa da Conversa\"].json.numero,\n    mensagem: '❌ Projeto não encontrado.\\n\\n🔁 Verifique se o ID informado está correto ou digite \"sair\" para encerrar.\\n\\nSe quiser, posso listar os projetos novamente.'\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3880,
+        -2380
+      ],
+      "id": "5b6ba49f-12dc-47d4-9bb9-7146333380d1",
+      "name": "Code"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "580996415104401",
+        "recipientPhoneNumber": "={{ $json.numero }}",
+        "textBody": "={{ $json.mensagem }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        -3660,
+        -2380
+      ],
+      "id": "2535d3b3-20bf-444d-b935-dee0e0a8880f",
+      "name": "WhatsApp Business Cloud3",
+      "webhookId": "9547ab38-024f-4235-8d1d-8fa253dcfee5",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "nmOK50BmNtE58pi2",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://script.google.com/macros/s/AKfycbwoKXFRZUPBOaHfh6oX5Ok6Dhj1v5T3tSvg_SKNGYB4YXp7WEQFH-yoPlnD7UPa-wuB/exec",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "titulo_projeto",
+              "value": "={{ $json.titulo_projeto }}"
+            },
+            {
+              "name": "status_atual",
+              "value": "={{ $json.status_atual }}"
+            },
+            {
+              "name": "objetivo",
+              "value": "={{ $json.objetivo }}"
+            },
+            {
+              "name": "resumo_5w2h",
+              "value": "={{ $json.resumo }}"
+            },
+            {
+              "name": "periodo_previsto",
+              "value": "={{ $json.periodo_previsto }}"
+            },
+            {
+              "name": "subtarefas_concluidas",
+              "value": "={{ $json.subtarefas_concluidas }}"
+            },
+            {
+              "name": "subtarefas_pendentes",
+              "value": "={{ $json.subtarefas_pendentes }}"
+            },
+            {
+              "name": "o_que",
+              "value": "={{ $json.o_que }}"
+            },
+            {
+              "name": "por_que",
+              "value": "={{ $json.por_que }}"
+            },
+            {
+              "name": "onde",
+              "value": "={{ $json.onde }}"
+            },
+            {
+              "name": "quando",
+              "value": "={{ $json.quando }}"
+            },
+            {
+              "name": "quem",
+              "value": "={{ $json.quem }}"
+            },
+            {
+              "name": "como",
+              "value": "={{ $json.como }}"
+            },
+            {
+              "name": "quanto",
+              "value": "={{ $json.quanto }}"
+            },
+            {
+              "name": "visao_geral",
+              "value": "={{ $json.visao_geral }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1720,
+        -2160
+      ],
+      "id": "c7185452-09f5-40e3-884f-0c486d5afc54",
+      "name": "Gerar Imagem Slide"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v22.0/{{ $vars.meta_phone_id }}/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "whatsAppApi",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "messaging_product",
+              "value": "whatsapp"
+            },
+            {
+              "name": "to",
+              "value": "={{ $('Switch').item.json.numero }}"
+            },
+            {
+              "name": "type",
+              "value": "image"
+            },
+            {
+              "name": "image",
+              "value": "={{ {\n  \"link\": $(\"Gerar Imagem Slide\").item.json.imagem_url,\n  \"caption\": $(\"Preparar Dados Slide\").item.json.titulo_projeto\n    ? \"📊 Status do Projeto: \" + $(\"Preparar Dados Slide\").item.json.titulo_projeto\n    : \"📊 Status do Projeto: (não informado)\"\n} }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1460,
+        -2160
+      ],
+      "id": "c8fdaa1a-97a2-4d83-8464-96744e1b064b",
+      "name": "Enviar Imagem no WhatsApp",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "nmOK50BmNtE58pi2",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "=https://cnc.kanbanize.com/api/v2/boards/1/columns/{{ $('If').item.json.data.data[0].column_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.BUSINESSMAP_API_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -3540,
+        -2180
+      ],
+      "id": "eb40e721-63f1-43a4-b3e2-ef1d9b34a69f",
+      "name": "Buscar Colunas do Board"
+    },
+    {
+      "parameters": {
+        "jsCode": "const projeto = $node[\"Responder Detalhes do Projeto\"].json;\nconst colunas = [$node[\"Buscar Colunas do Board\"].json.data]; // entre colchetes 👈\n\nconst colunaAtual = colunas.find(c => c.column_id === projeto.column_id);\n\nreturn [{\n  json: {\n    ...projeto,\n    status_atual: colunaAtual?.name || \"(não informado)\"\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3280,
+        -2180
+      ],
+      "id": "1533a190-ea32-41f2-a602-bc48c6d72c32",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const resultados = items.map(item => {\n  const dados = item.json || {};\n  const mensagem = dados.mensagem || '';\n  const status_atual = dados.status_atual || 'Não informado';\n\n  // Limpa os \\n para evitar interferência\n  const textoLimpo = mensagem.replace(/\\\\n/g, '\\n');\n\n  function extrair(texto, marcador) {\n    const regex = new RegExp(`\\\\*${marcador}:\\\\*\\\\s*(.*?)($|\\\\n)`, 'i');\n    const match = texto.match(regex);\n    return match ? match[1].trim() : 'Não informado';\n  }\n\n  const objetivo = extrair(textoLimpo, \"Objetivo\");\n  const concluidas = extrair(textoLimpo, \"Subtarefas Concluídas\");\n  const pendentes = extrair(textoLimpo, \"Subtarefas Pendentes\");\n\n  const prompt = `\nConsidere o seguinte cenário de projeto:\n\n- Objetivo: ${objetivo}\n- Status Atual: ${status_atual}\n- Atividades Concluídas: ${concluidas}\n- Atividades Pendentes: ${pendentes}\n\nCom base nisso, forneça uma visão geral estratégica e clara da situação do projeto, como se fosse um resumo de status para um diretor. Use linguagem profissional, breve e objetiva.\n`;\n\n  return { prompt };\n});\n\nreturn resultados;\n\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3080,
+        -2100
+      ],
+      "id": "01b6ed2f-4058-4dfc-b0fd-e17bafddb3ee",
+      "name": "Montar Prompt Visao Geral"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4",
+          "mode": "list",
+          "cachedResultName": "GPT-4"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Você é um analista especialista em gestão de projetos. Sua função é analisar os dados abaixo de um projeto e gerar um resumo gerencial curto, direto e estratégico para ser exibido em um slide de status.\n\nLimite o texto a no máximo 600 caracteres, evitando repetições e foco excessivo em justificativas. Utilize linguagem objetiva, voltada para gestores, destacando o que foi feito, o que está pendente, riscos e recomendação de ação imediata, se necessário.\n\nDados do projeto:\n- Título:{{ $('If').item.json.data.data[0].title }} \n- Status atual: {{ $('Code1').item.json.status_atual }}\n- Subtarefas concluídas: {{ $('If').item.json.data.data[0].finished_subtask_count }} de {{ $('If').item.json.data.data[0].finished_subtask_count + $('If').item.json.data.data[0].unfinished_subtask_count }} no total\n- Última movimentação no quadro:{{ $('If').item.json.data.data[0].in_current_position_since }}  (formato: DD/MM/AAAA)\n- Prazo final:  (formato: DD/MM/AAAA)\n- Objetivo:{{ $('If').item.json.data.data[0].description }} \n\nGere um único parágrafo com até 600 caracteres. Não repita os dados brutos. Gere insights claros a partir deles.",
+              "role": "system"
+            },
+            {
+              "content": "={{ $json.prompt }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        -2880,
+        -2080
+      ],
+      "id": "f3669d56-a5c6-4e96-85b4-75ec81fa3ec8",
+      "name": "OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "dI1Phah8u8nweQ0q",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  visao_geral: $node[\"OpenAI\"].json.message.content || \"Visão geral indisponível\"\n}];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2520,
+        -2080
+      ],
+      "id": "a809ac9b-8a1b-4326-a957-15339206892e",
+      "name": "Extrair Resposta OpenAI"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "18cf718a-dccf-49d6-ae37-2f7c51bb68fb",
+              "name": "titulo_projeto",
+              "value": "={{ $json.mensagem.match(/\\*Status do Projeto - (.*?)\\*/)?.[1] || '(sem título)' }}",
+              "type": "string"
+            },
+            {
+              "id": "a92cda45-f278-4cf6-8bed-c3c86ab3b6f3",
+              "name": "status_atual",
+              "value": "={{ $json.status_atual }}",
+              "type": "string"
+            },
+            {
+              "id": "6f89b6c9-8a41-4ae8-8d74-518d9f4126e7",
+              "name": "objetivo",
+              "value": "={{ $json.mensagem.replace(/=|\\&nbsp;|\\\\u00a0|📍/g, '').match(/\\*Objetivo:\\*\\s*([^*]*)/)?.[1]?.trim() || '(sem descrição)' }}",
+              "type": "string"
+            },
+            {
+              "id": "22c1c020-213f-48c3-9726-6d790700fdf5",
+              "name": "resumo",
+              "value": "={{ $json.mensagem.replace(/=|\\&nbsp;|\\\\u00a0/g, '').match(/\\*Resumo 5W2H:\\*\\s*\\n([\\s\\S]*?)\\n👉/)?.[1]?.trim() || '(sem resumo)' }}",
+              "type": "string"
+            },
+            {
+              "id": "46e42560-9f4d-4e3c-b0cd-203d4d44c7a5",
+              "name": "periodo_previsto",
+              "value": "={{ $json.mensagem.match(/\\*Período Previsto:\\* ([^\\n]*)/)?.[1] }}",
+              "type": "string"
+            },
+            {
+              "id": "409708ed-8cd5-4c17-85c1-8cf1f30bb47f",
+              "name": "subtarefas_concluidas",
+              "value": "={{ $json.mensagem.match(/\\*Subtarefas Concluídas:\\* ([^\\n]*)/)?.[1] }}",
+              "type": "string"
+            },
+            {
+              "id": "3a4480a3-4a44-490f-931a-1733a56e7ce5",
+              "name": "subtarefas_pendentes",
+              "value": "={{ $json.mensagem.match(/\\*Subtarefas Pendentes:\\* ([^\\n]*)/)?.[1] }}",
+              "type": "string"
+            },
+            {
+              "id": "ebdb33f8-053c-4c29-a701-0864e5743557",
+              "name": "o_que",
+              "value": "={{ $json.mensagem.match(/\\*O que\\?\\*\\s*([^🔹]*)/)?.[1]?.trim() || '(sem info)' }}\n",
+              "type": "string"
+            },
+            {
+              "id": "4d3807fc-05db-4e68-b35f-061ac88ed324",
+              "name": "por_que",
+              "value": "={{ $json.mensagem.match(/\\*Por que\\?\\*\\s*([^🔹]*)/)?.[1]?.trim() || '(sem info)' }}",
+              "type": "string"
+            },
+            {
+              "id": "ec27ca0a-6e1b-4bb0-a47b-f5ab3ce641e3",
+              "name": "onde",
+              "value": "={{ $json.mensagem.match(/\\*Onde\\?\\*\\s*([^🔹]*)/)?.[1]?.trim() || '(sem info)' }}",
+              "type": "string"
+            },
+            {
+              "id": "45d5f434-398b-41a4-ab6e-81173b20aa57",
+              "name": "quando",
+              "value": "={{ $json.mensagem.match(/\\*Quando\\?\\*\\s*([^🔹]*)/)?.[1]?.trim() || '(sem info)' }}",
+              "type": "string"
+            },
+            {
+              "id": "cd87ffe3-d50d-4d5e-8b2d-9c43a92d8395",
+              "name": "quem",
+              "value": "={{ $json.mensagem.match(/\\*Quem\\?\\*\\s*([^🔹]*)/)?.[1]?.trim() || '(sem info)' }}",
+              "type": "string"
+            },
+            {
+              "id": "d0a1ecd8-0496-4bb2-94c5-d8bcc5133959",
+              "name": "como",
+              "value": "={{ $json.mensagem.match(/\\*Como\\?\\*\\s*([^🔹]*)/)?.[1]?.trim() || '(sem info)' }}",
+              "type": "string"
+            },
+            {
+              "id": "81be54d1-8f4a-46b1-957a-2e9b21970ab7",
+              "name": "quanto",
+              "value": "={{ $json.mensagem.match(/\\*Quanto\\?\\*\\s*([^🔹]*)/)?.[1]?.trim() || '(sem info)' }}",
+              "type": "string"
+            },
+            {
+              "id": "209f9225-91c9-49b2-a328-6aed90d4b93b",
+              "name": "visao_geral",
+              "value": "={{ $json.visao_geral }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -2040,
+        -2160
+      ],
+      "id": "5cc90bb8-164a-4b33-a50b-e80c81e8fbd6",
+      "name": "Preparar Dados Slide"
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        -2340,
+        -2160
+      ],
+      "id": "4f034783-e1a8-4d61-9990-86b8695e3b72",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "580996415104401",
+        "recipientPhoneNumber": "={{ $json.numero }}",
+        "textBody": "={{ $json.mensagem }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        -4960,
+        -1620
+      ],
+      "id": "88185256-af2a-41fc-9541-a4010c84e14b",
+      "name": "WhatsApp Business Cloud1",
+      "webhookId": "624b0152-3a48-47fb-9159-f25102894bcf",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "nmOK50BmNtE58pi2",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.etapa }}",
+                    "rightValue": "menu_principal",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "3fc85fea-5370-4270-b919-6a552e43d1c2"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "menu_principal"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "55bfe77a-e2af-40fd-a613-ffbc9481f83f",
+                    "leftValue": "={{ $json.etapa }}",
+                    "rightValue": "aguardando_projeto_id",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "aguardando_projeto_id"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "18854c57-8d36-4a48-8f46-51c5e76c9bfc",
+                    "leftValue": "={{ $json.etapa }}",
+                    "rightValue": "modo_analitico",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "modo_analitico"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0b445c62-bb41-45fd-9091-19c4dd4d7dfc",
+                    "leftValue": "={{ $json.etapa }}",
+                    "rightValue": "validando_projeto_id",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "validando_projeto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b14961cf-9fc4-4879-acac-4ec679922ba4",
+                    "leftValue": "={{ $('Extrair Texto e Número').item.json.texto }}",
+                    "rightValue": "sair",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "sair"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "8fa8a62c-4f31-4992-aab1-391d7b709596",
+                    "leftValue": "={{ $json.etapa }}",
+                    "rightValue": "interpretando_pergunta_analitica",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "interpretando_pergunta_analitica"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -5340,
+        -1720
+      ],
+      "id": "afba443d-43cc-4b0e-be55-f9ee6510ced9",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "url": "https://cnc.kanbanize.com/api/v2/cards?board_ids=1&workflow_ids=2&fields=card_id,title,description,custom_id,owner_user_id,type_id,size,priority,color,deadline,reporter,created_at,revision,last_modified,in_current_position_since,board_id,workflow_id,column_id,lane_id,section,position,last_column_id,last_lane_id,version_id,archived_at,reason_id,discard_comment,discarded_at,is_blocked,block_reason,current_block_time,current_logged_time,current_cycle_time,child_card_stats,finished_subtask_count,unfinished_subtask_count,comment_count,first_request_time,first_start_time,first_end_time,last_request_time,last_start_time,last_end_time&expand=custom_fields,stickers,tag_ids,co_owner_ids,watcher_ids,attachments,cover_image,checked_column_checklist_items,initiative_details,annotations,subtasks,linked_cards,transitions,block_times,logged_times,logged_times_for_child_cards,lead_time_per_column,outcomes,outcome_current_values",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.BUSINESSMAP_API_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4700,
+        -1240
+      ],
+      "id": "518a09d5-0461-412c-8a9f-34c1a619c0e0",
+      "name": "Buscar Boards no Kanbanize - listagem1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const numero = $json.numero || \"\";\n\nreturn [\n  {\n    json: {\n      etapa: \"aguardando_pergunta_analitica\",\n      numero,\n      mensagem:\n        `🤖 Agora estou pronto para te ajudar com a análise dos projetos!\\n\\n` +\n        `Você pode me perguntar, por exemplo:\\n` +\n        `🔹 \"Qual projeto está parado?\"\\n` +\n        `🔹 \"O projeto 941 está atrasado?\"\\n` +\n        `🔹 \"Quais são os estratégicos?\"\\n` +\n        `🔹 \"Me dá um resumo geral\"\\n\\n` +\n        `💬 Escreva com suas palavras! Estou pronto pra responder.`\n    }\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4460,
+        -1180
+      ],
+      "id": "528da581-7f04-459c-b0cf-47c66484a137",
+      "name": "Mensagem Boas-vindas Analítica"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "580996415104401",
+        "recipientPhoneNumber": "={{ $('Switch').item.json.numero }}",
+        "textBody": "={{ $json.mensagem }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        -4240,
+        -1180
+      ],
+      "id": "74e44f63-738f-439d-b857-cbad33d9b200",
+      "name": "WhatsApp Business Cloud4",
+      "webhookId": "29fcf9d4-de89-488a-bbc1-ff73a2fe0b0c",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "nmOK50BmNtE58pi2",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const projetos = $items(\"Buscar Projetos do Board\", 0)[0].json.data.data;\nconst pergunta = $json.texto || '(sem pergunta)';\nconst hoje = new Date().toLocaleDateString('pt-BR');\n\nlet prompt = `Você é um assistente de análise de projetos.\\n`;\nprompt += `Hoje é ${hoje}.\\n`;\nprompt += `Abaixo está a lista de projetos com seus dados brutos:\\n\\n`;\n\nfor (const p of projetos) {\n  const concluidas = p.finished_subtask_count || 0;\n  const pendentes = p.unfinished_subtask_count || 0;\n  const total = concluidas + pendentes;\n\n  prompt += `- Projeto: ${p.title || '(sem título)'}\\n`;\n  prompt += `  ID: ${p.card_id}\\n`;\n  prompt += `  Status: ${p.status || p.column?.name || '(indefinido)'}\\n`;\n  prompt += `  Início: ${p.start_date || 'sem data'}\\n`;\n  prompt += `  Deadline: ${p.deadline || 'sem data'}\\n`;\n  prompt += `  Tarefas: ${concluidas} concluídas de ${total}\\n\\n`;\n}\n\n// 👇 Instruções específicas para IA\nprompt += `---\\n`;\nprompt += `Com base na pergunta do usuário abaixo, filtre os projetos que atendem ao critério.\\n`;\nprompt += `Não faça análise de todos os projetos. Responda apenas com os projetos relevantes.\\n`;\nprompt += `Seja direto e objetivo, sem explicações adicionais.\\n`;\nprompt += `Formate como lista com título, ID e observação se necessário.\\n\\n`;\n\nprompt += `📌 Pergunta do usuário:\\n\"${pergunta}\"\\n\\n`;\nprompt += `Responda abaixo:\\n`;\n\nreturn [{\n  json: {\n    prompt\n  }\n}];\n\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3560,
+        -1900
+      ],
+      "id": "022efdc8-928c-42c5-8c64-84ab8c1da7ec",
+      "name": "Montar Prompt para IA"
+    },
+    {
+      "parameters": {
+        "url": "https://cnc.kanbanize.com/api/v2/cards?board_ids=1&workflow_ids=2&fields=card_id,title,description,custom_id,owner_user_id,type_id,size,priority,color,deadline,reporter,created_at,revision,last_modified,in_current_position_since,board_id,workflow_id,column_id,lane_id,section,position,last_column_id,last_lane_id,version_id,archived_at,reason_id,discard_comment,discarded_at,is_blocked,block_reason,current_block_time,current_logged_time,current_cycle_time,child_card_stats,finished_subtask_count,unfinished_subtask_count,comment_count,first_request_time,first_start_time,first_end_time,last_request_time,last_start_time,last_end_time&expand=custom_fields,stickers,tag_ids,co_owner_ids,watcher_ids,attachments,cover_image,checked_column_checklist_items,initiative_details,annotations,subtasks,linked_cards,transitions,block_times,logged_times,logged_times_for_child_cards,lead_time_per_column,outcomes,outcome_current_values",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.BUSINESSMAP_API_KEY }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -5180,
+        -860
+      ],
+      "id": "994368e3-5838-43cc-9e6f-4e581eef5198",
+      "name": "Buscar Projetos do Board"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4",
+          "mode": "list",
+          "cachedResultName": "GPT-4"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system"
+            },
+            {
+              "content": "=Pergunta: {{ $json.pergunta_usuario }}\n\nLista de Projetos:\n{{ $json.dados_formatados }}\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        -4520,
+        -860
+      ],
+      "id": "365d17f9-99d5-456a-b7c4-4145a26463e8",
+      "name": "OpenAI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "dI1Phah8u8nweQ0q",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const respostaIA = $json.message.content || \"❌ Não consegui interpretar a análise no momento.\";\n\nreturn [{\n  json: {\n    numero: $json.numero || '', // ou resgate de outra etapa anterior\n    mensagem: `🧠 *Análise do Assistente de Projetos*\\n\\n${respostaIA.trim()}\\n\\nSe precisar de mais informações, é só perguntar!`\n  }\n}];\n\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4160,
+        -860
+      ],
+      "id": "a5df286a-5a99-4e32-8bce-d8970fa893c7",
+      "name": "Responder Análise IA no WhatsApp"
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "580996415104401",
+        "recipientPhoneNumber": "={{ $('Switch1').item.json.numero }}",
+        "textBody": "={{ $json.mensagem }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        -3940,
+        -860
+      ],
+      "id": "a0a22b1a-1cc9-43e0-9f14-f2b9e2feef80",
+      "name": "WhatsApp Business Cloud5",
+      "webhookId": "0f31de0d-7153-40bf-8669-85b8e1c20fe8",
+      "credentials": {
+        "whatsAppApi": {
+          "id": "nmOK50BmNtE58pi2",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const projetos = $node[\"Buscar Projetos do Board\"].json.data.data;\nconst pergunta = $node[\"Extrair Texto e Número\"].json.texto || $json.texto;\n\nfunction formatarData(dataISO) {\n  if (!dataISO) return \"sem data\";\n  const data = new Date(dataISO);\n  return data.toLocaleDateString('pt-BR');\n}\n\nfunction extrairCustomFields(campos) {\n  if (!campos || !Array.isArray(campos)) return \"\";\n  return campos.map(f => `   - ${f.name}: ${f.value || \"não preenchido\"}`).join(\"\\n\");\n}\n\nlet textoProjetos = \"📋 *Lista de Projetos Detalhada:*\\n\\n\";\n\nfor (const projeto of projetos) {\n  const titulo = projeto.title || \"sem título\";\n  const inicio = projeto.start_date || projeto.created_at || null;\n  const fim = projeto.deadline || null;\n  const responsavel = projeto.responsible_user_name || \"não atribuído\";\n  const prioridade = projeto.priority || \"não definida\";\n  const atualizadoEm = projeto.updated_at || null;\n  const tags = projeto.tags?.join(\", \") || \"sem tags\";\n  const subtarefas = projeto.child_card_stats || {};\n  const concluidas = subtarefas.finished || 0;\n  const pendentes = subtarefas.unfinished || 0;\n\n  const inicioFormatado = inicio ? formatarData(inicio) : \"sem data de início\";\n  const fimFormatado = fim ? formatarData(fim) : \"sem data de fim\";\n  const atualizadoFormatado = atualizadoEm ? formatarData(atualizadoEm) : \"sem atualização\";\n\n  const customFieldsTexto = extrairCustomFields(projeto.custom_fields);\n\n  textoProjetos += `• *${titulo}*\\n`;\n  textoProjetos += `   - Início: ${inicioFormatado}\\n`;\n  textoProjetos += `   - Fim: ${fimFormatado}\\n`;\n  textoProjetos += `   - Última atualização: ${atualizadoFormatado}\\n`;\n  textoProjetos += `   - Responsável: ${responsavel}\\n`;\n  textoProjetos += `   - Prioridade: ${prioridade}\\n`;\n  textoProjetos += `   - Tags: ${tags}\\n`;\n  textoProjetos += `   - Subtarefas: ${concluidas} concluídas / ${pendentes} pendentes\\n`;\n  \n  if (customFieldsTexto) {\n    textoProjetos += `   - Campos Personalizados:\\n${customFieldsTexto}\\n`;\n  }\n\n  textoProjetos += `\\n`; // espaçamento entre projetos\n}\n\nreturn [{\n  json: {\n    dados_formatados: textoProjetos,\n    pergunta_usuario: pergunta\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4920,
+        -860
+      ],
+      "id": "3a5f3668-33e4-4c5d-a225-19f491183d5a",
+      "name": "Preparar Dados para IA"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extrair Texto e Número",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Texto e Número": {
+      "main": [
+        [
+          {
+            "node": "Gerenciar Etapa da Conversa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerenciar Etapa da Conversa": {
+      "main": [
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Listar Projetos Disponíveis": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Business Cloud",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Business Cloud": {
+      "main": [
+        []
+      ]
+    },
+    "Responder Detalhes do Projeto": {
+      "main": [
+        [
+          {
+            "node": "Buscar Colunas do Board",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Boards no Kanbanize - listagem": {
+      "main": [
+        [
+          {
+            "node": "Listar Projetos Disponíveis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Boards no Kanbanize - detalhes": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Buscar Boards no Kanbanize - detalhes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar Boards no Kanbanize - listagem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "WhatsApp Business Cloud2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar Boards no Kanbanize - listagem1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Responder Detalhes do Projeto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Business Cloud3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar Imagem Slide": {
+      "main": [
+        [
+          {
+            "node": "Enviar Imagem no WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Colunas do Board": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "Montar Prompt Visao Geral",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Prompt Visao Geral": {
+      "main": [
+        [
+          {
+            "node": "OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Extrair Resposta OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Resposta OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Preparar Dados Slide": {
+      "main": [
+        [
+          {
+            "node": "Gerar Imagem Slide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Preparar Dados Slide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Business Cloud1": {
+      "main": [
+        []
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Business Cloud1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Buscar Projetos do Board",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Boards no Kanbanize - listagem1": {
+      "main": [
+        [
+          {
+            "node": "Mensagem Boas-vindas Analítica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensagem Boas-vindas Analítica": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Business Cloud4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Business Cloud4": {
+      "main": [
+        []
+      ]
+    },
+    "Buscar Projetos do Board": {
+      "main": [
+        [
+          {
+            "node": "Preparar Dados para IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Prompt para IA": {
+      "main": [
+        []
+      ]
+    },
+    "OpenAI1": {
+      "main": [
+        [
+          {
+            "node": "Responder Análise IA no WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder Análise IA no WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp Business Cloud5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Dados para IA": {
+      "main": [
+        [
+          {
+            "node": "OpenAI1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c0d4953f-ad8c-464e-a97e-630936d2836b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "0cfc302d7a25d8a9b2f3aa87f2abdee8602bfb2a8201073c4b37b1de1850b34f"
+  },
+  "id": "92kbQlJAwMG7Wqoo",
+  "tags": []
+}
